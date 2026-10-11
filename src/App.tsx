@@ -489,6 +489,24 @@ export default function App() {
   const feedbackRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const step1SubjectSectionRef = useRef<HTMLDivElement>(null);
+
+  const handleSelectSubjectFromHistory = (subjId: SubjectId) => {
+    setSelectedSubjectId(subjId);
+    setSelectedItem('');
+    const subjectUnits = ALL_UNITS_MASTER.filter((u) => u.subjectId === subjId);
+    const validCurrentGradeUnits = subjectUnits.filter((u) => u.year === selectedGrade);
+    if (validCurrentGradeUnits.length > 0) {
+      setSelectedUnitId(validCurrentGradeUnits[0].id);
+    } else if (subjectUnits.length > 0) {
+      setSelectedGrade(subjectUnits[0].year);
+      setSelectedUnitId(subjectUnits[0].id);
+    }
+
+    if (step1SubjectSectionRef.current) {
+      step1SubjectSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   useEffect(() => {
     if (isJudged) {
@@ -930,7 +948,7 @@ export default function App() {
             </div>
 
             {/* Step 1: 教科選択 (7教科 - メタリックテーマ) */}
-            <div>
+            <div ref={step1SubjectSectionRef} className="scroll-mt-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 text-[10px] font-mono">
@@ -1278,7 +1296,7 @@ export default function App() {
             <SubjectHistoryAccordion
               scores={scores}
               onResetRequest={() => setShowResetModal(true)}
-              onSelectSubject={(subjId) => setSelectedSubjectId(subjId)}
+              onSelectSubject={handleSelectSubjectFromHistory}
             />
           </div>
         )}

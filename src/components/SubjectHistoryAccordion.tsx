@@ -399,10 +399,11 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
                         <button
                           type="button"
                           onClick={() => onSelectSubject(subj.id)}
-                          className="text-slate-600 hover:text-slate-950 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                          className="text-cyan-800 hover:text-cyan-950 bg-cyan-50/90 hover:bg-cyan-100 border border-cyan-300 font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all active:scale-95 text-xs shadow-2xs"
+                          title={`${subj.name}を選択して画面上部へ移動`}
                         >
-                          <span>この教科を選択</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <span>この教科を選択 ⬆</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-cyan-600" />
                         </button>
                       )}
                     </div>
