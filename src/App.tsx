@@ -180,7 +180,7 @@ export default function App() {
   const [selectedCount, setSelectedCount] = useState<number>(5);
   const [selectedUnitId, setSelectedUnitId] = useState<string>('j1-1');
   const [selectedItem, setSelectedItem] = useState<string>(''); // 詳細項目（空文字は全項目総合）
-  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(true);
+  const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [openGuideSections, setOpenGuideSections] = useState<{
     usage: boolean;
     policy: boolean;

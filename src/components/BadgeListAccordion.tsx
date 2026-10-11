@@ -133,25 +133,25 @@ export const BadgeListAccordion: React.FC<BadgeListAccordionProps> = ({ stats })
         aria-expanded={isOpen}
       >
         {/* 上段: トロフィータイトル ＋ 連続日数 ＋ 開閉トグル */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-black tracking-wide text-xs sm:text-sm flex items-center gap-1.5 text-amber-200 truncate">
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <span className="font-black tracking-wide text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 text-amber-200 shrink-0">
               <Trophy className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
-              <span>【称号 ＆ 達成バッジ】</span>
+              <span>【称号閲覧】</span>
             </span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 shrink-0">
-              {unlockedCount} / {totalCount} 獲得 [{progressPct}%]
+              {unlockedCount}/{totalCount} [{progressPct}%]
             </span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* 連続日数バッジ（常時表示） */}
-            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-orange-600/30 to-red-600/30 border border-orange-500/50 text-orange-300 text-xs font-black shadow-2xs font-mono">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-600/30 to-red-600/30 border border-orange-500/50 text-orange-300 text-[11px] sm:text-xs font-black shadow-2xs font-mono shrink-0">
               <Flame className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
               <span>連続{stats.currentStreak}日</span>
             </div>
 
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-800/80 border border-slate-700/60 text-amber-400 group-hover:border-amber-400 transition-colors">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-slate-800/80 border border-slate-700/60 text-amber-400 group-hover:border-amber-400 transition-colors shrink-0">
               {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </div>
           </div>
@@ -175,7 +175,7 @@ export const BadgeListAccordion: React.FC<BadgeListAccordionProps> = ({ stats })
           <div className="p-3 rounded-xl bg-slate-950/80 border border-amber-500/30 text-xs text-slate-300 flex items-start gap-2 shadow-inner">
             <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <span className="font-bold text-amber-300">テスの称号指南：</span>
+              <span className="font-bold text-amber-300">ガリ勉くんの称号指南：</span>
               <p className="text-slate-300 leading-relaxed font-medium">
                 日々のドリル完走、100%満点、弱点克服リトライで称号を解放！全30種をコンプリートして『神になったガリ勉くん』を目指そう！
               </p>
