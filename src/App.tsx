@@ -53,6 +53,17 @@ import { Footer } from './components/Footer';
 import { SmartKeyboard } from './components/SmartKeyboard';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { SubjectHistoryAccordion } from './components/SubjectHistoryAccordion';
+import { BadgeListAccordion } from './components/BadgeListAccordion';
+import { BadgeCelebrationToast } from './components/BadgeCelebrationToast';
+import {
+  BadgeStatsStore,
+  BADGE_STORAGE_KEY,
+  createInitialBadgeStats,
+  evaluateBadges,
+  getJSTDateString,
+  getDayDifferenceJST,
+  BadgeDefinition,
+} from './data/badges';
 
 const STORAGE_KEY = 'study_drill_makers_scores';
 
@@ -220,18 +231,44 @@ export default function App() {
   const [scores, setScores] = useState<ScoreStore>({});
   const [prevUnitAcc, setPrevUnitAcc] = useState<number | null>(null);
 
+  // Badges & Achievements Store
+  const [badgeStats, setBadgeStats] = useState<BadgeStatsStore>(() => createInitialBadgeStats());
+  const [newlyUnlockedBadges, setNewlyUnlockedBadges] = useState<BadgeDefinition[]>([]);
+  const [isRetrying, setIsRetrying] = useState<boolean>(false);
+
   // Speech synthesizer status
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
 
-  // Load scores on mount
+  // Load scores & badge stats on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
+      let loadedScores: ScoreStore = {};
       if (stored) {
-        setScores(JSON.parse(stored));
+        loadedScores = JSON.parse(stored);
+        setScores(loadedScores);
+      }
+
+      const storedBadge = localStorage.getItem(BADGE_STORAGE_KEY);
+      if (storedBadge) {
+        const parsed: BadgeStatsStore = JSON.parse(storedBadge);
+        const today = getJSTDateString();
+        if (parsed.lastActiveDate && parsed.lastActiveDate !== today) {
+          const diff = getDayDifferenceJST(parsed.lastActiveDate, today);
+          if (diff > 1) {
+            parsed.currentStreak = 0; // 1日でも空くと0に戻る
+          }
+        }
+        const { updatedStats } = evaluateBadges(parsed, loadedScores);
+        setBadgeStats(updatedStats);
+      } else {
+        const initial = createInitialBadgeStats(loadedScores);
+        const { updatedStats } = evaluateBadges(initial, loadedScores);
+        setBadgeStats(updatedStats);
+        localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(updatedStats));
       }
     } catch (e) {
-      console.warn('Failed to parse stored scores', e);
+      console.warn('Failed to parse stored scores or badges', e);
     }
   }, []);
 
@@ -290,10 +327,95 @@ export default function App() {
     }
   };
 
+  const recordDrillCompletionToBadges = (
+    totalCount: number,
+    correctCount: number,
+    isRetrySession: boolean
+  ) => {
+    const today = getJSTDateString();
+    const isAllCorrect = correctCount === totalCount;
+    // 5問以上の演習で全問正解した場合のみ数える
+    const isPerfect = isAllCorrect && totalCount >= 5;
+    // 🔥弱点克服リトライで全問正解した1回とする
+    const isRetrySuccess = isRetrySession && isAllCorrect;
+
+    setBadgeStats((prev) => {
+      // 連続日数の判定（日本時間の0時で区切り、1日でも空くと0に戻る）
+      let newStreak = prev.currentStreak;
+      if (!prev.lastActiveDate) {
+        newStreak = 1;
+      } else if (prev.lastActiveDate === today) {
+        newStreak = Math.max(1, prev.currentStreak);
+      } else {
+        const diff = getDayDifferenceJST(prev.lastActiveDate, today);
+        if (diff === 1) {
+          newStreak = prev.currentStreak + 1;
+        } else {
+          newStreak = 1;
+        }
+      }
+
+      const diffKey =
+        selectedDifficulty === 'basic'
+          ? 'basic'
+          : selectedDifficulty === 'advanced'
+          ? 'advanced'
+          : 'standard';
+
+      const updatedDiff = {
+        ...prev.difficultyCompleted,
+        [diffKey]: (prev.difficultyCompleted[diffKey] || 0) + (isRetrySession ? 0 : 1),
+      };
+
+      const updatedSubj = {
+        ...prev.subjectCompleted,
+        [selectedSubjectId]:
+          (prev.subjectCompleted[selectedSubjectId] || 0) + (isRetrySession ? 0 : 1),
+      };
+
+      const updatedRaw: BadgeStatsStore = {
+        ...prev,
+        totalDrillsCompleted: prev.totalDrillsCompleted + (isRetrySession ? 0 : 1),
+        totalQuestionsAnswered: prev.totalQuestionsAnswered + totalCount,
+        perfectScoreCount: prev.perfectScoreCount + (isPerfect ? 1 : 0),
+        retrySuccessCount: prev.retrySuccessCount + (isRetrySuccess ? 1 : 0),
+        difficultyCompleted: updatedDiff,
+        subjectCompleted: updatedSubj,
+        currentStreak: newStreak,
+        longestStreak: Math.max(prev.longestStreak, newStreak),
+        lastActiveDate: today,
+      };
+
+      const { updatedStats, newlyUnlocked } = evaluateBadges(updatedRaw, scores);
+
+      try {
+        localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(updatedStats));
+      } catch (e) {
+        console.warn('Failed to save badge stats', e);
+      }
+
+      if (newlyUnlocked.length > 0) {
+        setNewlyUnlockedBadges((existing) => [...existing, ...newlyUnlocked]);
+      }
+
+      return updatedStats;
+    });
+  };
+
   const handleResetData = () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
       setScores({});
+      // 獲得済みのバッジは将来にわたって取り消さない（ヒデ仕様厳守）
+      setBadgeStats((prev) => {
+        const preserved: BadgeStatsStore = {
+          ...createInitialBadgeStats({}),
+          unlockedBadgeIds: prev.unlockedBadgeIds,
+          longestStreak: prev.longestStreak,
+        };
+        localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(preserved));
+        return preserved;
+      });
       setShowResetModal(false);
     } catch (e) {
       console.error(e);
@@ -335,6 +457,8 @@ export default function App() {
 
       setQuestions(data.questions);
       setCurrentQuestionIdx(0);
+      setIsRetrying(false);
+      setNewlyUnlockedBadges([]);
       setCurrentScore(0);
       setUserAnswersHistory([]);
       setUserTextInput('');
@@ -432,6 +556,8 @@ export default function App() {
     const retryQuestions = questions.filter((q) => weakQuestionTexts.has(q.question));
     if (retryQuestions.length === 0) return;
 
+    setIsRetrying(true);
+    setNewlyUnlockedBadges([]);
     setQuestions(retryQuestions);
     setCurrentQuestionIdx(0);
     setCurrentScore(0);
@@ -705,6 +831,7 @@ export default function App() {
       const total = questions.length;
       const partialCount = userAnswersHistory.filter((h) => h.status === 'partial').length;
       saveScoreRecord(currentUnit.id, currentScore, total, partialCount);
+      recordDrillCompletionToBadges(total, currentScore, isRetrying);
       setCurrentView('result');
     }
   };
@@ -1292,6 +1419,9 @@ export default function App() {
               )}
             </button>
 
+            {/* 🏆 称号 ＆ 達成バッジ (アコーディオン式) */}
+            <BadgeListAccordion stats={badgeStats} />
+
             {/* 各教科演習履歴 (アコーディオン式) */}
             <SubjectHistoryAccordion
               scores={scores}
@@ -1754,6 +1884,14 @@ export default function App() {
         {/* VIEW 3: RESULT SCREEN */}
         {currentView === 'result' && (
           <div className="bg-white text-slate-900 border-2 border-slate-200 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 animate-in zoom-in-95 duration-200">
+            {/* Newly earned badges celebration toast */}
+            {newlyUnlockedBadges.length > 0 && (
+              <BadgeCelebrationToast
+                newBadges={newlyUnlockedBadges}
+                onDismiss={() => setNewlyUnlockedBadges([])}
+              />
+            )}
+
             {/* Header Trophy & Score */}
             <div className="text-center space-y-2">
               <div className="inline-flex p-4 rounded-full bg-amber-100 text-amber-600 border border-amber-300 shadow-md">
