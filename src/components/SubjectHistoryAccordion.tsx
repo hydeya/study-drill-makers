@@ -31,6 +31,8 @@ interface SubjectStatItem {
   drillsCount: number;
   totalQuestions: number;
   correctQuestions: number;
+  partialQuestions: number;
+  incorrectQuestions: number;
   accuracy: number | null;
   practicedUnits: PracticedUnitDetail[];
 }
@@ -97,6 +99,7 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
     let drillsCount = 0;
     let totalQuestions = 0;
     let correctQuestions = 0;
+    let partialQuestions = 0;
     const practicedUnits: PracticedUnitDetail[] = [];
 
     for (const u of units) {
@@ -105,10 +108,12 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
         drillsCount += rec.drillsCount;
         totalQuestions += rec.total;
         correctQuestions += rec.correct;
+        partialQuestions += rec.partial || 0;
         practicedUnits.push({ unit: u, record: rec });
       }
     }
 
+    const incorrectQuestions = Math.max(0, totalQuestions - correctQuestions - partialQuestions);
     const accuracy =
       totalQuestions > 0 ? Math.round((correctQuestions / totalQuestions) * 100) : null;
 
@@ -121,6 +126,8 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
       drillsCount,
       totalQuestions,
       correctQuestions,
+      partialQuestions,
+      incorrectQuestions,
       accuracy,
       practicedUnits,
     };
@@ -130,6 +137,8 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
   const totalDrillsAll = subjectStats.reduce((sum, s) => sum + s.drillsCount, 0);
   const totalQuestionsAll = subjectStats.reduce((sum, s) => sum + s.totalQuestions, 0);
   const totalCorrectAll = subjectStats.reduce((sum, s) => sum + s.correctQuestions, 0);
+  const totalPartialAll = subjectStats.reduce((sum, s) => sum + s.partialQuestions, 0);
+  const totalIncorrectAll = Math.max(0, totalQuestionsAll - totalCorrectAll - totalPartialAll);
   const overallAccuracy =
     totalQuestionsAll > 0 ? Math.round((totalCorrectAll / totalQuestionsAll) * 100) : null;
 
@@ -205,22 +214,32 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
           </div>
         </div>
 
-        {/* 下段（2行目）: 演習回数・総解答数・全体正解率 */}
+        {/* 下段（2行目）: 演習回数・総解答数・内訳（〇・△・✕）・全体正解率 */}
         <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-300">
-          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <span>
-              演習回数:{' '}
+              演習:{' '}
               <strong className={isOpen ? 'text-cyan-300' : 'text-fuchsia-300'}>
                 {totalDrillsAll}回
               </strong>
             </span>
             <span className="text-slate-600">|</span>
             <span>
-              総解答数: <strong className="text-slate-100">{totalQuestionsAll}問</strong>
+              総問: <strong className="text-slate-100">{totalQuestionsAll}問</strong>
             </span>
+            {totalQuestionsAll > 0 && (
+              <>
+                <span className="text-slate-600">|</span>
+                <span className="flex items-center gap-1.5 font-bold">
+                  <span className="text-emerald-400">〇{totalCorrectAll}</span>
+                  <span className="text-amber-400">△{totalPartialAll}</span>
+                  <span className="text-rose-400">✕{totalIncorrectAll}</span>
+                </span>
+              </>
+            )}
             <span className="text-slate-600">|</span>
             <span>
-              全体正解率:{' '}
+              正解率:{' '}
               <strong
                 className={`font-black ${
                   overallAccuracy !== null
@@ -302,30 +321,38 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
                       </div>
                     </div>
 
-                    {/* Numbers: Drills Count & Questions */}
-                    <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-center font-mono text-xs shadow-2xs">
+                    {/* Numbers: Drills Count & 〇・△・✕ Breakdown */}
+                    <div className="grid grid-cols-4 gap-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200 text-center font-mono text-xs shadow-2xs">
                       <div>
-                        <span className="text-[10px] text-slate-500 block font-sans font-medium">
-                          演習回数
+                        <span className="text-[9px] text-slate-500 block font-sans font-medium">
+                          演習
                         </span>
-                        <span className="font-black text-slate-900 text-xs sm:text-sm">
+                        <span className="font-black text-slate-900 text-xs">
                           {subj.drillsCount}回
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-500 block font-sans font-medium">
-                          総解答数
+                        <span className="text-[9px] text-emerald-700 block font-sans font-bold">
+                          〇 正解
                         </span>
-                        <span className="font-black text-slate-900 text-xs sm:text-sm">
-                          {subj.totalQuestions}問
+                        <span className="font-black text-emerald-700 text-xs">
+                          {subj.correctQuestions}問
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-500 block font-sans font-medium">
-                          正解数
+                        <span className="text-[9px] text-amber-700 block font-sans font-bold">
+                          △ 部分点
                         </span>
-                        <span className="font-black text-emerald-700 text-xs sm:text-sm">
-                          {subj.correctQuestions}問
+                        <span className="font-black text-amber-700 text-xs">
+                          {subj.partialQuestions}問
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-rose-700 block font-sans font-bold">
+                          ✕ 不正解
+                        </span>
+                        <span className="font-black text-rose-700 text-xs">
+                          {subj.incorrectQuestions}問
                         </span>
                       </div>
                     </div>
@@ -406,8 +433,10 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
                                   {unit.title}
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-mono">
-                                  演習: {record.drillsCount}回 | 解答: {record.total}問中{' '}
-                                  {record.correct}問正解
+                                  演習: {record.drillsCount}回 | 解答: {record.total}問（
+                                  <span className="text-emerald-700 font-bold">〇{record.correct}</span>{' '}
+                                  <span className="text-amber-700 font-bold">△{record.partial || 0}</span>{' '}
+                                  <span className="text-rose-700 font-bold">✕{Math.max(0, record.total - record.correct - (record.partial || 0))}</span>）
                                 </div>
                               </div>
                               <div className="text-right shrink-0">

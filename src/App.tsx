@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ArrowLeft,
   AlertTriangle,
+  AlertCircle,
   CheckCircle2,
   XCircle,
   RotateCcw,
@@ -200,6 +201,11 @@ export default function App() {
   const [isJudging, setIsJudging] = useState<boolean>(false);
   const [currentFeedback, setCurrentFeedback] = useState<string>('');
   const [currentIsCorrect, setCurrentIsCorrect] = useState<boolean>(false);
+  const [currentJudgeStatus, setCurrentJudgeStatus] = useState<AnswerJudgement | null>(null);
+  const [currentPoints, setCurrentPoints] = useState<number | null>(null);
+  const [currentMaxPoints, setCurrentMaxPoints] = useState<number>(5);
+  const [currentRubricEarned, setCurrentRubricEarned] = useState<string>('');
+  const [currentRubricDeducted, setCurrentRubricDeducted] = useState<string>('');
 
   // Loading & Error States
   const [isLoadingDrill, setIsLoadingDrill] = useState<boolean>(false);
@@ -255,9 +261,14 @@ export default function App() {
     ALL_UNITS_MASTER.find((u) => u.id === selectedUnitId) || ALL_UNITS_MASTER[0];
   const unitItems = getUnitItems(currentUnit);
 
-  const saveScoreRecord = (unitId: string, correctCount: number, totalCount: number) => {
+  const saveScoreRecord = (
+    unitId: string,
+    correctCount: number,
+    totalCount: number,
+    partialCount: number = 0
+  ) => {
     const accPct = Math.round((correctCount / totalCount) * 100);
-    const prev = scores[unitId] || { total: 0, correct: 0, drillsCount: 0, lastAcc: 0 };
+    const prev = scores[unitId] || { total: 0, correct: 0, partial: 0, drillsCount: 0, lastAcc: 0 };
     setPrevUnitAcc(prev.total > 0 ? Math.round((prev.correct / prev.total) * 100) : null);
 
     const updated: ScoreStore = {
@@ -265,6 +276,7 @@ export default function App() {
       [unitId]: {
         total: prev.total + totalCount,
         correct: prev.correct + correctCount,
+        partial: (prev.partial || 0) + partialCount,
         drillsCount: prev.drillsCount + 1,
         lastAcc: accPct,
       },
@@ -330,6 +342,11 @@ export default function App() {
       setLastSubmittedAnswer('');
       setIsJudged(false);
       setCurrentFeedback('');
+      setCurrentJudgeStatus(null);
+      setCurrentPoints(null);
+      setCurrentMaxPoints(5);
+      setCurrentRubricEarned('');
+      setCurrentRubricDeducted('');
 
       const prev = scores[unitToStart.id];
       setPrevUnitAcc(prev && prev.total > 0 ? Math.round((prev.correct / prev.total) * 100) : null);
@@ -424,6 +441,11 @@ export default function App() {
     setLastSubmittedAnswer('');
     setIsJudged(false);
     setCurrentFeedback('');
+    setCurrentJudgeStatus(null);
+    setCurrentPoints(null);
+    setCurrentMaxPoints(5);
+    setCurrentRubricEarned('');
+    setCurrentRubricDeducted('');
     setCurrentView('practice');
   };
 
@@ -498,7 +520,13 @@ export default function App() {
       if (!selectedChoice) return;
       setLastSubmittedAnswer(selectedChoice);
       const isCorrect = selectedChoice.trim() === currentQ.answer.trim();
+      const choiceStatus: AnswerJudgement = isCorrect ? 'correct' : 'incorrect';
       setCurrentIsCorrect(isCorrect);
+      setCurrentJudgeStatus(choiceStatus);
+      setCurrentPoints(isCorrect ? 5 : 0);
+      setCurrentMaxPoints(5);
+      setCurrentRubricEarned(isCorrect ? '✔ 正しい選択肢を選択できました（+5点）' : '');
+      setCurrentRubricDeducted(isCorrect ? '' : '✖ 誤った選択肢を選びました（-5点）');
       if (isCorrect) setCurrentScore((prev) => prev + 1);
 
       setCurrentFeedback(
@@ -508,7 +536,6 @@ export default function App() {
       );
       setIsJudged(true);
 
-      const choiceStatus: AnswerJudgement = isCorrect ? 'correct' : 'incorrect';
       setUserAnswersHistory((prev) => [
         ...prev,
         {
@@ -519,6 +546,8 @@ export default function App() {
           status: choiceStatus,
           isCorrect,
           explanation: currentQ.explanation,
+          points: isCorrect ? 5 : 0,
+          maxPoints: 5,
         },
       ]);
     } else {
@@ -548,20 +577,40 @@ export default function App() {
           setActiveModelName(data.model);
         }
         const isCorrect = Boolean(data.correct);
-        setCurrentIsCorrect(isCorrect);
-        if (isCorrect) setCurrentScore((prev) => prev + 1);
-        setCurrentFeedback(
-          data.feedback ||
-            (isCorrect ? '正解と判定しました！' : '不正解です。模範解答を確認しましょう。')
-        );
-        setIsJudged(true);
-
         const judgeStatus: AnswerJudgement =
           data.status === 'correct' || data.status === 'partial' || data.status === 'incorrect'
             ? data.status
             : isCorrect
             ? 'correct'
             : 'incorrect';
+
+        const points =
+          typeof data.points === 'number'
+            ? data.points
+            : judgeStatus === 'correct'
+            ? 5
+            : judgeStatus === 'partial'
+            ? 3
+            : 0;
+        const maxPoints = data.maxPoints || 5;
+
+        setCurrentIsCorrect(isCorrect);
+        setCurrentJudgeStatus(judgeStatus);
+        setCurrentPoints(points);
+        setCurrentMaxPoints(maxPoints);
+        setCurrentRubricEarned(data.rubricEarned || '');
+        setCurrentRubricDeducted(data.rubricDeducted || '');
+
+        if (isCorrect) setCurrentScore((prev) => prev + 1);
+        setCurrentFeedback(
+          data.feedback ||
+            (judgeStatus === 'correct'
+              ? '正解と判定しました！'
+              : judgeStatus === 'partial'
+              ? '惜しい！部分点獲得です。あと一歩で満点！'
+              : '不正解です。模範解答を確認しましょう。')
+        );
+        setIsJudged(true);
 
         setUserAnswersHistory((prev) => [
           ...prev,
@@ -574,8 +623,8 @@ export default function App() {
             isCorrect,
             explanation: currentQ.explanation,
             feedback: data.feedback,
-            points: data.points,
-            maxPoints: data.maxPoints,
+            points,
+            maxPoints,
             rubricEarned: data.rubricEarned,
             rubricDeducted: data.rubricDeducted,
           },
@@ -584,12 +633,18 @@ export default function App() {
         console.error('Judge error:', e);
         // Fallback local comparison
         const isCorrect = userVal === currentQ.answer || currentQ.answer.includes(userVal);
+        const fallbackStatus: AnswerJudgement = isCorrect ? 'correct' : 'incorrect';
         setCurrentIsCorrect(isCorrect);
+        setCurrentJudgeStatus(fallbackStatus);
+        setCurrentPoints(isCorrect ? 5 : 0);
+        setCurrentMaxPoints(5);
+        setCurrentRubricEarned(isCorrect ? '✔ 正解要件を満たしています' : '');
+        setCurrentRubricDeducted(isCorrect ? '' : '✖ 模範解答と照合して要点を確認しましょう');
+
         if (isCorrect) setCurrentScore((prev) => prev + 1);
         setCurrentFeedback(isCorrect ? '正解です！' : '不正解です。模範解答を確認しましょう。');
         setIsJudged(true);
 
-        const fallbackStatus: AnswerJudgement = isCorrect ? 'correct' : 'incorrect';
         setUserAnswersHistory((prev) => [
           ...prev,
           {
@@ -600,6 +655,8 @@ export default function App() {
             status: fallbackStatus,
             isCorrect,
             explanation: currentQ.explanation,
+            points: isCorrect ? 5 : 0,
+            maxPoints: 5,
           },
         ]);
       } finally {
@@ -622,9 +679,14 @@ export default function App() {
       setLastSubmittedAnswer('');
       setIsJudged(false);
       setCurrentFeedback('');
+      setCurrentJudgeStatus(null);
+      setCurrentPoints(null);
+      setCurrentRubricEarned('');
+      setCurrentRubricDeducted('');
     } else {
       const total = questions.length;
-      saveScoreRecord(currentUnit.id, currentScore, total);
+      const partialCount = userAnswersHistory.filter((h) => h.status === 'partial').length;
+      saveScoreRecord(currentUnit.id, currentScore, total, partialCount);
       setCurrentView('result');
     }
   };
@@ -1487,22 +1549,30 @@ export default function App() {
                 tabIndex={-1}
                 className="space-y-5 animate-in fade-in duration-300 outline-none focus:outline-none"
               >
-                {/* Result Banner */}
+                {/* Result Banner: 〇 完全正解 / △ 部分点 / ✕ 不正解 */}
                 <div
                   className={`p-5 rounded-2xl border-2 flex items-start gap-4 shadow-sm ${
-                    currentIsCorrect
+                    currentJudgeStatus === 'correct'
                       ? 'bg-emerald-50 border-emerald-500 text-emerald-950'
+                      : currentJudgeStatus === 'partial'
+                      ? 'bg-amber-50 border-amber-500 text-amber-950'
                       : 'bg-rose-50 border-rose-400 text-rose-950'
                   }`}
                 >
-                  {currentIsCorrect ? (
+                  {currentJudgeStatus === 'correct' ? (
                     <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : currentJudgeStatus === 'partial' ? (
+                    <AlertCircle className="w-8 h-8 text-amber-600 shrink-0 mt-0.5" />
                   ) : (
                     <XCircle className="w-8 h-8 text-rose-500 shrink-0 mt-0.5" />
                   )}
                   <div className="space-y-1">
                     <div className="font-black text-lg sm:text-xl">
-                      {currentIsCorrect ? '正解！お見事です' : '不正解... 自分の解答と模範解答を比較しましょう'}
+                      {currentJudgeStatus === 'correct'
+                        ? '〇 完全正解！お見事です'
+                        : currentJudgeStatus === 'partial'
+                        ? `△ 部分点獲得！あと一歩で満点（${currentPoints ?? 3}/${currentMaxPoints}点）`
+                        : '✕ 不正解... 模範解答と比較しましょう'}
                     </div>
                     <div className="text-sm sm:text-base leading-relaxed font-semibold">
                       {currentFeedback}
@@ -1510,38 +1580,73 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Rubric Breakdown Section (獲得要素・減点NG点) */}
+                {(currentRubricEarned || currentRubricDeducted) && (
+                  <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-700/80 space-y-2 text-xs sm:text-sm shadow-md">
+                    <div className="text-[11px] font-mono text-cyan-400 font-bold flex items-center gap-1">
+                      <span>【福井県入試特化・要素採点カルテ】</span>
+                    </div>
+                    {currentRubricEarned && (
+                      <div className="p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-200 font-bold flex items-start gap-2">
+                        <span className="shrink-0 text-emerald-400 font-black">【得点要素】</span>
+                        <span className="leading-relaxed">{currentRubricEarned}</span>
+                      </div>
+                    )}
+                    {currentRubricDeducted && (
+                      <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 font-bold flex items-start gap-2">
+                        <span className="shrink-0 text-rose-400 font-black">【減点・改善点】</span>
+                        <span className="leading-relaxed">{currentRubricDeducted}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Comparison Section: あなたの解答 & 模範解答 (併記) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* あなたの解答 */}
                   <div
                     className={`p-4 rounded-2xl border-2 space-y-2 transition-all shadow-xs ${
-                      currentIsCorrect
+                      currentJudgeStatus === 'correct'
                         ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+                        : currentJudgeStatus === 'partial'
+                        ? 'bg-amber-50/90 border-amber-300 text-amber-950'
                         : 'bg-rose-50/90 border-rose-300 text-rose-950'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span
                         className={`text-xs font-bold tracking-wider flex items-center gap-1.5 ${
-                          currentIsCorrect ? 'text-emerald-800' : 'text-rose-800'
+                          currentJudgeStatus === 'correct'
+                            ? 'text-emerald-800'
+                            : currentJudgeStatus === 'partial'
+                            ? 'text-amber-800'
+                            : 'text-rose-800'
                         }`}
                       >
                         <span>✍️ あなたの解答</span>
                       </span>
                       <span
                         className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
-                          currentIsCorrect
+                          currentJudgeStatus === 'correct'
                             ? 'bg-emerald-200 text-emerald-900 border border-emerald-400/50'
+                            : currentJudgeStatus === 'partial'
+                            ? 'bg-amber-200 text-amber-950 border border-amber-400/50'
                             : 'bg-rose-200 text-rose-900 border border-rose-400/50'
                         }`}
                       >
-                        {currentIsCorrect ? '判定：正解' : '判定：不正解'}
+                        {currentJudgeStatus === 'correct'
+                          ? '判定：〇 完全正解'
+                          : currentJudgeStatus === 'partial'
+                          ? `判定：△ 部分点（${currentPoints ?? 3}点）`
+                          : '判定：✕ 不正解'}
                       </span>
                     </div>
                     <div
                       className={`p-3 rounded-xl border text-base sm:text-lg font-black font-sans break-words min-h-[52px] flex items-center ${
-                        currentIsCorrect
+                        currentJudgeStatus === 'correct'
                           ? 'bg-white/80 border-emerald-200 text-emerald-950'
+                          : currentJudgeStatus === 'partial'
+                          ? 'bg-white/80 border-amber-200 text-amber-950'
                           : 'bg-white/80 border-rose-200 text-rose-950'
                       }`}
                     >
@@ -1646,15 +1751,40 @@ export default function App() {
             {/* Score Cards */}
             <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
               <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-200 text-center">
-                <span className="text-xs font-bold text-slate-500 block mb-1">正解数</span>
+                <span className="text-xs font-bold text-slate-500 block mb-1">正解数（〇）</span>
                 <span className="text-3xl font-black text-slate-900">
                   {currentScore} / {questions.length}
                 </span>
               </div>
               <div className="bg-slate-50 p-4 rounded-2xl border-2 border-slate-200 text-center">
-                <span className="text-xs font-bold text-slate-500 block mb-1">正解率</span>
+                <span className="text-xs font-bold text-slate-500 block mb-1">厳密正解率</span>
                 <span className="text-3xl font-black text-amber-600">
                   {Math.round((currentScore / questions.length) * 100)}%
+                </span>
+              </div>
+            </div>
+
+            {/* 〇・△・✕ 内訳カード */}
+            <div className="grid grid-cols-3 gap-2.5 max-w-md mx-auto">
+              <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-2.5 text-center shadow-xs">
+                <span className="text-[11px] font-bold text-emerald-800 block">〇 完全正解</span>
+                <span className="text-2xl font-black text-emerald-700 font-mono">
+                  {userAnswersHistory.filter((h) => h.status === 'correct').length}
+                  <span className="text-xs font-sans ml-0.5 font-bold">問</span>
+                </span>
+              </div>
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-2.5 text-center shadow-xs">
+                <span className="text-[11px] font-bold text-amber-800 block">△ 部分点</span>
+                <span className="text-2xl font-black text-amber-700 font-mono">
+                  {userAnswersHistory.filter((h) => h.status === 'partial').length}
+                  <span className="text-xs font-sans ml-0.5 font-bold">問</span>
+                </span>
+              </div>
+              <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-2.5 text-center shadow-xs">
+                <span className="text-[11px] font-bold text-rose-800 block">✕ 不正解</span>
+                <span className="text-2xl font-black text-rose-700 font-mono">
+                  {userAnswersHistory.filter((h) => h.status === 'incorrect').length}
+                  <span className="text-xs font-sans ml-0.5 font-bold">問</span>
                 </span>
               </div>
             </div>
@@ -1671,28 +1801,59 @@ export default function App() {
               </div>
             )}
 
-            {/* Wrong Questions Review List */}
-            {userAnswersHistory.filter((h) => !h.isCorrect).length > 0 && (
+            {/* Wrong & Partial Questions Review List */}
+            {userAnswersHistory.filter((h) => h.status !== 'correct').length > 0 && (
               <div className="space-y-2.5 max-w-2xl mx-auto pt-2">
-                <div className="text-sm font-black text-rose-600 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>間違えた問題の復習ポイント</span>
+                <div className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <span>復習ポイント（△ 部分点・✕ 不正解）</span>
                 </div>
-                <div className="space-y-2.5 max-h-[260px] overflow-y-auto p-1">
+                <div className="space-y-2.5 max-h-[300px] overflow-y-auto p-1">
                   {userAnswersHistory
-                    .filter((h) => !h.isCorrect)
+                    .filter((h) => h.status !== 'correct')
                     .map((item, idx) => (
                       <div
                         key={idx}
-                        className="bg-slate-50 border-2 border-rose-200 rounded-xl p-4 text-xs sm:text-sm space-y-1.5"
+                        className={`rounded-xl p-4 text-xs sm:text-sm space-y-2 border-2 ${
+                          item.status === 'partial'
+                            ? 'bg-amber-50/70 border-amber-300'
+                            : 'bg-rose-50/70 border-rose-300'
+                        }`}
                       >
-                        <div className="font-bold text-slate-900">{item.question}</div>
-                        <div className="text-rose-600 font-semibold">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-bold text-slate-900 flex-1">{item.question}</div>
+                          <span
+                            className={`text-[10px] font-black px-2.5 py-0.5 rounded-full shrink-0 border ${
+                              item.status === 'partial'
+                                ? 'bg-amber-200 text-amber-950 border-amber-400'
+                                : 'bg-rose-200 text-rose-950 border-rose-400'
+                            }`}
+                          >
+                            {item.status === 'partial'
+                              ? `△ 部分点 (${item.points ?? 3}/5点)`
+                              : '✕ 不正解 (0/5点)'}
+                          </span>
+                        </div>
+                        <div
+                          className={`font-semibold ${
+                            item.status === 'partial' ? 'text-amber-900' : 'text-rose-700'
+                          }`}
+                        >
                           あなたの解答: {item.userAnswer}
                         </div>
-                        <div className="text-emerald-700 font-bold">
+                        <div className="text-emerald-800 font-bold">
                           模範解答: {item.correctAnswer}
                         </div>
+                        {item.rubricEarned && (
+                          <div className="p-2 rounded-lg bg-emerald-100/70 text-emerald-900 text-[11px] font-bold">
+                            {item.rubricEarned}
+                          </div>
+                        )}
+                        {item.rubricDeducted && (
+                          <div className="p-2 rounded-lg bg-rose-100/70 text-rose-900 text-[11px] font-bold">
+                            {item.rubricDeducted}
+                          </div>
+                        )}
                         <div className="text-slate-600 text-xs leading-relaxed pt-1 border-t border-slate-200">
                           解説: {item.explanation}
                         </div>
