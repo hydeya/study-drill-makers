@@ -170,7 +170,7 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span
-              className={`font-black tracking-wide text-xs sm:text-sm flex items-center gap-1.5 truncate ${
+              className={`font-black tracking-wide text-sm flex items-center gap-1.5 shrink-0 ${
                 isOpen ? 'text-slate-100' : 'text-fuchsia-200'
               }`}
             >
@@ -182,10 +182,10 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
               <span>【各教科演習履歴】</span>
             </span>
             <span
-              className={`text-[10px] font-mono px-2 py-0.5 rounded-full shrink-0 ${
+              className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-full shadow-2xs shrink-0 ${
                 isOpen
-                  ? 'bg-cyan-950 border border-cyan-500/30 text-cyan-300'
-                  : 'bg-fuchsia-950/80 border border-fuchsia-500/40 text-fuchsia-300'
+                  ? 'bg-cyan-950 border border-cyan-500/40 text-cyan-300'
+                  : 'bg-fuchsia-950/80 border border-fuchsia-500/50 text-fuchsia-300'
               }`}
             >
               {practicedSubjectCount} / 7教科完了

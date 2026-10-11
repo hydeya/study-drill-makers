@@ -133,20 +133,20 @@ export const BadgeListAccordion: React.FC<BadgeListAccordionProps> = ({ stats })
         aria-expanded={isOpen}
       >
         {/* 上段: トロフィータイトル ＋ 連続日数 ＋ 開閉トグル */}
-        <div className="flex items-center justify-between gap-1.5 sm:gap-2">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-            <span className="font-black tracking-wide text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5 text-amber-200 shrink-0">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-black tracking-wide text-sm flex items-center gap-1.5 text-amber-200 shrink-0">
               <Trophy className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
               <span>【称号閲覧】</span>
             </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/40 text-amber-300 shrink-0">
+            <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-950/90 border border-amber-500/50 text-amber-300 shadow-2xs shrink-0">
               {unlockedCount}/{totalCount} [{progressPct}%]
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {/* 連続日数バッジ（常時表示） */}
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-orange-600/30 to-red-600/30 border border-orange-500/50 text-orange-300 text-[11px] sm:text-xs font-black shadow-2xs font-mono shrink-0">
+            <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-orange-600/30 to-red-600/30 border border-orange-500/50 text-orange-300 text-xs font-black shadow-2xs font-mono shrink-0">
               <Flame className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
               <span>連続{stats.currentStreak}日</span>
             </div>
