@@ -45,7 +45,12 @@ export const SmartKeyboard: React.FC<SmartKeyboardProps> = ({
 
   // フィルタリングされたキー
   const filteredKeys = config.hasCategories
-    ? config.keys.filter((k) => currentTab === 'all' || k.cat === currentTab)
+    ? config.keys.filter(
+        (k) =>
+          currentTab === 'all' ||
+          k.cat === currentTab ||
+          (k.cats && k.cats.includes(currentTab))
+      )
     : config.keys;
 
   return (

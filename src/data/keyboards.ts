@@ -4,6 +4,7 @@ export interface KeyItem {
   label: string;
   val: string;
   cat?: string;
+  cats?: string[];
   isWide?: boolean;
   isAction?: boolean;
 }
@@ -66,7 +67,12 @@ export const KEYBOARD_CONFIGS: Record<SubjectId, KeyboardLayout | null> = {
       { label: '³', val: '³', cat: 'pow' },
 
       // 計算・記号
+      { label: '+', val: '+', cat: 'sym' },
       { label: '-', val: '-', cat: 'sym' },
+      { label: '=', val: '=', cat: 'sym' },
+      { label: '±', val: '±', cat: 'sym' },
+      { label: '(', val: '(', cat: 'sym' },
+      { label: ')', val: ')', cat: 'sym' },
       { label: ',', val: ',', cat: 'sym' },
       { label: ':', val: ':', cat: 'sym' },
       { label: '/', val: '/', cat: 'sym' },
@@ -99,9 +105,13 @@ export const KEYBOARD_CONFIGS: Record<SubjectId, KeyboardLayout | null> = {
       { label: '8', val: '8', cat: 'phys' },
       { label: '9', val: '9', cat: 'phys' },
       { label: '.', val: '.', cat: 'phys' },
-      { label: '-', val: '-', cat: 'phys' },
+      { label: '+', val: '+', cat: 'chem', cats: ['chem', 'phys'] },
+      { label: '-', val: '-', cat: 'phys', cats: ['chem', 'phys'] },
+      { label: '=', val: '=', cat: 'chem', cats: ['chem', 'phys'] },
 
-      // 化学・イオン
+      // 化学・イオン・累乗
+      { label: '²', val: '²', cat: 'chem', cats: ['chem', 'phys'] },
+      { label: '³', val: '³', cat: 'chem', cats: ['chem', 'phys'] },
       { label: '⁺', val: '⁺', cat: 'chem' },
       { label: '⁻', val: '⁻', cat: 'chem' },
       { label: '₂', val: '₂', cat: 'chem' },
