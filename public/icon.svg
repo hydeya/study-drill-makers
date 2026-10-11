@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="none" stroke="#0891b2" stroke-width="8" opacity="0.4"/>
+  <!-- Central Drill / Memo Icon -->
+  <g transform="translate(116, 106)">
+    <!-- Clipboard base -->
+    <rect x="20" y="50" width="240" height="270" rx="28" fill="#1e293b" stroke="url(#cyanGrad)" stroke-width="12"/>
+    <!-- Lines inside -->
+    <rect x="60" y="110" width="160" height="14" rx="7" fill="#64748b"/>
+    <rect x="60" y="150" width="160" height="14" rx="7" fill="#64748b"/>
+    <rect x="60" y="190" width="110" height="14" rx="7" fill="#64748b"/>
+    <rect x="60" y="230" width="130" height="14" rx="7" fill="#38bdf8"/>
+    <!-- Clip -->
+    <rect x="95" y="25" width="90" height="45" rx="14" fill="#0284c7"/>
+    <!-- Pencil -->
+    <g transform="translate(170, 160) rotate(-40)">
+      <polygon points="0,0 24,0 24,130 12,155 0,130" fill="#f59e0b"/>
+      <polygon points="0,0 24,0 24,30 0,30" fill="#ef4444"/>
+      <polygon points="12,155 7,145 17,145" fill="#0f172a"/>
+    </g>
+  </g>
+</svg>

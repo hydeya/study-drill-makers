@@ -1,0 +1,6 @@
+{
+  "name": "【Study DRILL Makers】",
+  "description": "文部科学省中学学習指導要領準拠の全教科AIドリル。国語・数学・英語・理科・地理・歴史・公民の自動出題、スマートキーボード、自己監査、AI柔軟記述採点。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
