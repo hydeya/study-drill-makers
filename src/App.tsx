@@ -1419,15 +1419,15 @@ export default function App() {
               )}
             </button>
 
-            {/* 🏆 称号 ＆ 達成バッジ (アコーディオン式) */}
-            <BadgeListAccordion stats={badgeStats} />
-
             {/* 各教科演習履歴 (アコーディオン式) */}
             <SubjectHistoryAccordion
               scores={scores}
               onResetRequest={() => setShowResetModal(true)}
               onSelectSubject={handleSelectSubjectFromHistory}
             />
+
+            {/* 🏆 称号 ＆ 達成バッジ (アコーディオン式) */}
+            <BadgeListAccordion stats={badgeStats} />
           </div>
         )}
 
