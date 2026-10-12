@@ -1062,7 +1062,7 @@ export default function App() {
                           ・<strong className="text-emerald-300">出力前事前自己監査（AUDIT）</strong>：AIが作問を生成した直後、ユーザー画面に表示する前に「教科純度」「指定問数」「選択肢の独立性・重複なし」「数式Unicode記号の規格適合」を厳格に自己検査。不適合と判定された場合は自動的に破棄・再生成されます。
                         </p>
                         <p>
-                          ・<strong className="text-cyan-300">システムエンジン構成</strong>：メイン稼働モデルとして高精度推論を誇る <code className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-[11px]">gemini-3.8-flash</code> を採用。障害発生時にはフォールバック候補 <code className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-[11px]">gemini-3.1-flash-lite</code> へのシームレスな自動切替設計となっています。
+                          ・<strong className="text-cyan-300">システムエンジン構成</strong>：最高峰の思考力・記述精度を誇る <code className="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300 font-mono text-[11px]">gemini-3.8-flash</code> を主軸採用。「速度より品質最優先」方針に基づき、Liteモデルを完全排除した多重フルスペックFlashプール（3.7-flash ➔ 3.6-flash ➔ 3.5-flash）への自動フェイルオーバーおよび指導要領シード救済を備えています。
                         </p>
                         <p>
                           ・<strong className="text-amber-300">ハルシネーション抑止</strong>：各単元の解説には教科書範囲外の混入を防止するプロンプト制約を課し、中学生にとって信頼性の高い学習教材品質を維持します。
@@ -1490,8 +1490,8 @@ export default function App() {
                   className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-mono font-bold flex items-center gap-1 border shadow-xs ${
                     activeModelName.includes('3.8-flash')
                       ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                      : activeModelName.includes('3.1-flash-lite')
-                      ? 'bg-amber-50 text-amber-900 border-amber-300 animate-pulse'
+                      : activeModelName.includes('flash')
+                      ? 'bg-cyan-50 text-cyan-900 border-cyan-300'
                       : 'bg-slate-100 text-slate-700 border-slate-300'
                   }`}
                 >
@@ -1499,9 +1499,13 @@ export default function App() {
                   <span>
                     {activeModelName.includes('3.8-flash')
                       ? '3.8-flash'
-                      : activeModelName.includes('3.1-flash-lite')
-                      ? '3.1-lite(予備)'
-                      : '精選バンク'}
+                      : activeModelName.includes('3.7-flash')
+                      ? '3.7-flash'
+                      : activeModelName.includes('3.6-flash')
+                      ? '3.6-flash'
+                      : activeModelName.includes('3.5-flash')
+                      ? '3.5-flash'
+                      : '指導要領バンク'}
                   </span>
                 </span>
               </div>

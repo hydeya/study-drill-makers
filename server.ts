@@ -30,9 +30,11 @@ if (apiKey) {
   });
 }
 
-// Multi-tier Model Architecture: gemini-3.8-flash as primary (with retry), gemini-3.1-flash-lite as emergency backup
+// Multi-tier Full-Spec Flash Architecture (速度より品質最優先: Lite完全排除)
+// Primary: gemini-3.8-flash (with retry)
+// Multi-tier Fallback: gemini-3.7-flash -> gemini-3.6-flash -> gemini-3.5-flash
 const PRIMARY_MODEL = 'gemini-3.8-flash';
-const BACKUP_MODEL = 'gemini-3.1-flash-lite';
+const FALLBACK_MODELS = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash'];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -321,12 +323,14 @@ app.post('/api/drill/generate', async (req: Request, res: Response) => {
   }
   const textCount = numCount - choiceCount;
 
-  // Attempt Gemini API with multi-tier failover: 3.8-flash (attempt 1) -> 3.8-flash (retry) -> 3.1-flash-lite (emergency)
+  // Attempt Gemini API with multi-tier failover: 3.8-flash (attempt 1) -> 3.8-flash (retry) -> 3.7-flash -> 3.6-flash -> 3.5-flash
   if (ai) {
     const attempts = [
       { model: PRIMARY_MODEL, timeoutMs: 8500, isRetry: false },
       { model: PRIMARY_MODEL, timeoutMs: 8500, isRetry: true },
-      { model: BACKUP_MODEL, timeoutMs: 5000, isRetry: false },
+      { model: 'gemini-3.7-flash', timeoutMs: 7500, isRetry: false },
+      { model: 'gemini-3.6-flash', timeoutMs: 7500, isRetry: false },
+      { model: 'gemini-3.5-flash', timeoutMs: 7500, isRetry: false },
     ];
 
     for (let i = 0; i < attempts.length; i++) {
@@ -513,12 +517,14 @@ app.post('/api/drill/judge', async (req: Request, res: Response) => {
     return;
   }
 
-  // 2. Gemini semantic 3-tier judging with multi-tier failover (3.8-flash -> retry -> 3.1-flash-lite)
+  // 2. Gemini semantic 3-tier judging with multi-tier failover (3.8-flash -> retry -> 3.7-flash -> 3.6-flash -> 3.5-flash)
   if (ai) {
     const judgeAttempts = [
       { model: PRIMARY_MODEL, timeoutMs: 4500, isRetry: false },
       { model: PRIMARY_MODEL, timeoutMs: 4500, isRetry: true },
-      { model: BACKUP_MODEL, timeoutMs: 3500, isRetry: false },
+      { model: 'gemini-3.7-flash', timeoutMs: 4000, isRetry: false },
+      { model: 'gemini-3.6-flash', timeoutMs: 4000, isRetry: false },
+      { model: 'gemini-3.5-flash', timeoutMs: 4000, isRetry: false },
     ];
 
     for (let i = 0; i < judgeAttempts.length; i++) {
