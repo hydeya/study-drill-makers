@@ -83,38 +83,41 @@ export const Footer: React.FC<{ activeModel?: string }> = ({
               {/* 現在稼働中モデル（息子さん向け・明快な稼働ステータス表示） */}
               {(() => {
                 const isPrimary = activeModel.includes('3.8-flash');
-                const isBackup = activeModel.includes('3.1-flash-lite');
-                const isBank = !isPrimary && !isBackup;
+                const isFailover =
+                  activeModel.includes('3.7-flash') ||
+                  activeModel.includes('3.6-flash') ||
+                  activeModel.includes('3.5-flash');
+                const isBank = !isPrimary && !isFailover;
 
                 const badgeBg = isPrimary
                   ? 'bg-emerald-950/80 border-emerald-500/50 text-emerald-300'
-                  : isBackup
-                  ? 'bg-amber-950/80 border-amber-500/50 text-amber-300 animate-pulse'
-                  : 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300';
+                  : isFailover
+                  ? 'bg-cyan-950/80 border-cyan-500/50 text-cyan-300'
+                  : 'bg-indigo-950/80 border-indigo-500/50 text-indigo-300';
 
                 const badgeText = isPrimary
                   ? '【メイン】最高品質稼働中'
-                  : isBackup
-                  ? '【非常時】第2予備発動中'
+                  : isFailover
+                  ? '【フルスペック予備】自動フェイルオーバー中'
                   : '【オフライン救済】精選バンク';
 
                 const descText = isPrimary
                   ? '文科省指導要領100%準拠・高精度記述ルーブリック採点'
-                  : isBackup
-                  ? '3.8-flash混雑時の緊急バックアップ発動・学習継続中'
+                  : isFailover
+                  ? '混雑時自動切替・フルスペックFlashにより品質低下ゼロで学習継続中'
                   : '東京書籍・開隆堂・啓林館 教科書シラバス準拠データベース';
 
                 return (
                   <div className={`p-3 rounded-xl border space-y-1.5 transition-all ${
                     isPrimary
                       ? 'bg-[#0e172a] border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                      : isBackup
-                      ? 'bg-[#1a1307] border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.25)]'
-                      : 'bg-[#091522] border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                      : isFailover
+                      ? 'bg-[#091522] border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.2)]'
+                      : 'bg-[#100e24] border-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.15)]'
                   }`}>
                     <div className="text-slate-400 font-sans text-[11px] font-semibold flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-cyan-300">
-                        <Cpu className={`w-3.5 h-3.5 ${isPrimary ? 'text-emerald-400' : isBackup ? 'text-amber-400' : 'text-cyan-400'}`} />
+                        <Cpu className={`w-3.5 h-3.5 ${isPrimary ? 'text-emerald-400' : isFailover ? 'text-cyan-400' : 'text-indigo-400'}`} />
                         <span>現在稼働中モデル</span>
                       </span>
                       <span className={`px-2 py-0.5 border rounded text-[9px] font-sans font-bold ${badgeBg}`}>
@@ -122,7 +125,7 @@ export const Footer: React.FC<{ activeModel?: string }> = ({
                       </span>
                     </div>
                     <div className={`pt-0.5 font-bold text-base tracking-wider font-mono ${
-                      isPrimary ? 'text-emerald-300' : isBackup ? 'text-amber-300' : 'text-cyan-300'
+                      isPrimary ? 'text-emerald-300' : isFailover ? 'text-cyan-300' : 'text-indigo-300'
                     }`}>
                       {activeModel}
                     </div>
@@ -133,7 +136,7 @@ export const Footer: React.FC<{ activeModel?: string }> = ({
                 );
               })()}
 
-              {/* モデル優先順位（多段フェイルオーバー仕様：実在モデルのみ） */}
+              {/* モデル優先順位（多段フェイルオーバー仕様：Lite完全排除のフルスペックプール） */}
               <div className="bg-[#0e172a] p-3 rounded-xl border border-slate-700/80 space-y-2">
                 <div className="text-slate-300 font-sans text-[11px] font-semibold flex items-center justify-between">
                   <span className="flex items-center gap-1.5 text-cyan-300">
@@ -141,7 +144,7 @@ export const Footer: React.FC<{ activeModel?: string }> = ({
                     <span>モデル稼働アーキテクチャ</span>
                   </span>
                   <span className="text-[9px] text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 px-1.5 py-0.5 rounded font-sans">
-                    多段フェイルオーバー
+                    Lite完全排除・フルスペックプール
                   </span>
                 </div>
                 <div className="space-y-1.5 pt-0.5 text-[11px] font-mono">
@@ -165,44 +168,84 @@ export const Footer: React.FC<{ activeModel?: string }> = ({
                     <span className="text-[10px] text-emerald-400 shrink-0 font-sans">第1優先</span>
                   </div>
 
-                  {/* ② 非常用予備モデル */}
+                  {/* ② フルスペック第1予備 */}
                   <div className={`flex items-center justify-between px-2.5 py-1.5 rounded border transition-colors ${
-                    activeModel.includes('3.1-flash-lite')
-                      ? 'bg-amber-500/20 border-amber-400/70 text-amber-300 font-bold'
+                    activeModel.includes('3.7-flash')
+                      ? 'bg-cyan-500/20 border-cyan-400/70 text-cyan-300 font-bold'
                       : 'bg-slate-900/60 border-slate-800 text-slate-400'
                   }`}>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs">② gemini-3.1-flash-lite</span>
-                        {activeModel.includes('3.1-flash-lite') && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-950 text-amber-300 border border-amber-400">緊急発動中</span>
-                        )}
-                      </div>
-                      <div className="text-[9px] text-slate-400 font-sans mt-0.5">
-                        非常用バックアップ（3.8連続エラー時のみ緊急発動）
-                      </div>
-                    </div>
-                    <span className="text-[10px] text-amber-400 shrink-0 font-sans">第2予備</span>
-                  </div>
-
-                  {/* ③ オフライン精選バンク */}
-                  <div className={`flex items-center justify-between px-2.5 py-1.5 rounded border transition-colors ${
-                    !activeModel.includes('3.8-flash') && !activeModel.includes('3.1-flash-lite')
-                      ? 'bg-cyan-500/15 border-cyan-400/60 text-cyan-300 font-bold'
-                      : 'bg-slate-900/60 border-slate-800 text-slate-400'
-                  }`}>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs">③ 文科省指導要領精選バンク</span>
-                        {!activeModel.includes('3.8-flash') && !activeModel.includes('3.1-flash-lite') && (
+                        <span className="text-xs">② gemini-3.7-flash</span>
+                        {activeModel.includes('3.7-flash') && (
                           <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-400">稼働中</span>
                         )}
                       </div>
                       <div className="text-[9px] text-slate-400 font-sans mt-0.5">
-                        完全オフライン救済（東京書籍/開隆堂シラバス）
+                        フルスペック第1予備（3.8過負荷時の自動バトンタッチ）
                       </div>
                     </div>
-                    <span className="text-[10px] text-cyan-400 shrink-0 font-sans">救済バンク</span>
+                    <span className="text-[10px] text-cyan-400 shrink-0 font-sans">第2優先</span>
+                  </div>
+
+                  {/* ③ フルスペック第2予備 */}
+                  <div className={`flex items-center justify-between px-2.5 py-1.5 rounded border transition-colors ${
+                    activeModel.includes('3.6-flash')
+                      ? 'bg-cyan-500/20 border-cyan-400/70 text-cyan-300 font-bold'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                  }`}>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">③ gemini-3.6-flash</span>
+                        {activeModel.includes('3.6-flash') && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-400">稼働中</span>
+                        )}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-sans mt-0.5">
+                        フルスペック第2予備（連続障害時の高品質バックアップ）
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-cyan-400 shrink-0 font-sans">第3優先</span>
+                  </div>
+
+                  {/* ④ フルスペック第3予備 */}
+                  <div className={`flex items-center justify-between px-2.5 py-1.5 rounded border transition-colors ${
+                    activeModel.includes('3.5-flash')
+                      ? 'bg-cyan-500/20 border-cyan-400/70 text-cyan-300 font-bold'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                  }`}>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">④ gemini-3.5-flash</span>
+                        {activeModel.includes('3.5-flash') && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-400">稼働中</span>
+                        )}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-sans mt-0.5">
+                        フルスペック第3予備（広域障害時の最終AI防壁）
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-cyan-400 shrink-0 font-sans">第4優先</span>
+                  </div>
+
+                  {/* ⑤ オフライン救済バンク */}
+                  <div className={`flex items-center justify-between px-2.5 py-1.5 rounded border transition-colors ${
+                    !activeModel.includes('flash')
+                      ? 'bg-indigo-500/15 border-indigo-400/60 text-indigo-300 font-bold'
+                      : 'bg-slate-900/60 border-slate-800 text-slate-400'
+                  }`}>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">⑤ 文科省指導要領精選バンク</span>
+                        {!activeModel.includes('flash') && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-400">稼働中</span>
+                        )}
+                      </div>
+                      <div className="text-[9px] text-slate-400 font-sans mt-0.5">
+                        完全オフライン救済（通信断線時の絶対的セーフティネット）
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-indigo-400 shrink-0 font-sans">救済バンク</span>
                   </div>
                 </div>
               </div>
