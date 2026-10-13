@@ -141,6 +141,30 @@ function runSelfAudit(
       continue;
     }
 
+    // 数学・理科の初等算術・四則演算の自動検算＆ハルシネーション自己修正フィルター
+    if (subjectId === 'math' || subjectId === 'science') {
+      const mathMatch = questionText.match(/(?:計算しなさい|求めよ|値は|答えなさい|[：:])?[^\d\-+]*?([+-]?\d+)\s*([\+\-\*\/×÷])\s*([+-]?\d+)/);
+      if (mathMatch) {
+        const n1 = parseInt(mathMatch[1], 10);
+        const op = mathMatch[2];
+        const n2 = parseInt(mathMatch[3], 10);
+        let correctVal: number | null = null;
+        if (op === '+' || op === '＋') correctVal = n1 + n2;
+        else if (op === '-' || op === '−' || op === 'ー') correctVal = n1 - n2;
+        else if (op === '*' || op === '×') correctVal = n1 * n2;
+        else if ((op === '/' || op === '÷') && n2 !== 0) correctVal = n1 / n2;
+
+        if (correctVal !== null && Number.isInteger(correctVal)) {
+          const ansNum = parseInt(answerText.replace(/[^0-9\-]/g, ''), 10);
+          if (!isNaN(ansNum) && ansNum !== correctVal) {
+            console.warn(`[Auto-Audit Correction] Corrected math in "${questionText}": AI answered "${answerText}", auto-corrected to "${correctVal}"`);
+            answerText = String(correctVal);
+            explanationText = `${n1} ${op} ${n2} = ${correctVal} となります。`;
+          }
+        }
+      }
+    }
+
     const hasOptions = Array.isArray(q.options) && q.options.length >= 4;
     if (hasOptions) {
       let options = q.options.map((opt: any) => sanitizeMathText(String(opt).trim())).filter(Boolean);
@@ -153,12 +177,12 @@ function runSelfAudit(
       }
       options = uniqueOpts.slice(0, 4);
 
-      // Answer must match one of options
+      // If answer was corrected or doesn't match, ensure answer is in options
       const hasMatch = options.some(
         (opt: string) => opt === answerText || opt.toLowerCase() === answerText.toLowerCase()
       );
       if (!hasMatch) {
-        answerText = options[0];
+        options[0] = answerText;
       }
 
       sanitized.push({
@@ -352,6 +376,7 @@ ${itemInstruction}
 ※【絶対厳守ルール】「すべて4択問題」の出力は絶対に禁止です。生徒の自力アウトプット力・記述力を鍛えるため、記述問題を主軸（${textCount}/${numCount}問）とし、4択問題は概念定着の導入（${choiceCount}問）としてのみ配置してください。${choiceCount === 0 ? '（全問記述問題として作成してください）' : ''}
 
 【厳格な作成＆6大自己監査ルール（★最重要）】
+0. 数学・理科の計算検算義務（計算ミス完全撲滅・最優先）: 数学・理科の計算問題、方程式、式の計算、関数、確率、理科の濃度・オームの法則などの計算を伴う問題では、必ず自ら途中の計算過程をステップごとに検算すること。15+6=21のように、足し算・引き算・掛け算・割り算・符号の算術的ミスは絶対に許されない。数学的に100%正確な模範解答のみを出力すること。
 1. 難易度純度100%: 選択された【${diffDesc}】の難易度を100%厳守すること。
 2. 未習範囲自動封鎖（最重要）: 中学${unit.year}年生の指定単元より上位の公式・文法・解法（三平方の定理、平方根、二次方程式、現在完了、関係代名詞等）の出題・解説での使用を完全禁止。必ず指定学年の範囲内でのみ作問すること。
 3. 字体チェック: 中国簡体字（问）を完全禁止し、必ず日本の字体（問・直・骨・過・遅・海）のみを出力すること。
@@ -384,7 +409,7 @@ ${itemInstruction}
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
-            temperature: 0.6,
+            temperature: 0.2,
             thinkingConfig: { thinkingBudget: 0 },
           },
         });
@@ -558,6 +583,9 @@ app.post('/api/drill/judge', async (req: Request, res: Response) => {
 3. ✕ 不正解（status: "incorrect", points: 0, correct: false）:
    - 根本的な知識違い、誤った概念、別単元の用語、完全な白紙・無回答。
    - rubricDeducted: 不足している基本概念の指摘。
+
+4. 【数学・理科の模範解答誤植セーフティネット】:
+   - 万が一、問題文側の模範解答（cleanModel）自体に明らかな算術計算ミス（例: 15+6の計算で模範解答が19になっている等）があり、生徒の解答（cleanUser）の方が数学的に正しい（例: 21）場合は、模範解答の誤りを正し、生徒の解答を必ず【〇 完全正解（status: "correct", points: 5, correct: true）】として正当に満点判定してください。生徒を理不尽に減点することは固く禁止します。
 
 必ず以下の厳密なJSON形式のみで出力してください（Markdownコードブロックや前置きは禁止）：
 {

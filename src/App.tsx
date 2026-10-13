@@ -55,6 +55,13 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { SubjectHistoryAccordion } from './components/SubjectHistoryAccordion';
 import { BadgeListAccordion } from './components/BadgeListAccordion';
 import { BadgeCelebrationToast } from './components/BadgeCelebrationToast';
+import { GasSyncSettingsAccordion } from './components/GasSyncSettingsAccordion';
+import {
+  sendDrillResultToGas,
+  getJSTTimestamp,
+  getGasConfig,
+  GasDrillPayload,
+} from './services/gasSync';
 import {
   BadgeStatsStore,
   BADGE_STORAGE_KEY,
@@ -239,6 +246,13 @@ export default function App() {
   // Speech synthesizer status
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
 
+  // Google Apps Script (GAS) 成績自動連携ステータス
+  const [gasSyncStatus, setGasSyncStatus] = useState<
+    'idle' | 'sending' | 'success' | 'queued' | 'not_configured'
+  >('idle');
+  const [gasSyncMessage, setGasSyncMessage] = useState<string>('');
+  const lastSyncedDrillSessionIdRef = useRef<string>('');
+
   // Load scores & badge stats on mount
   useEffect(() => {
     try {
@@ -355,10 +369,10 @@ export default function App() {
         }
       }
 
-      const diffKey =
+      const diffKey: 'basic' | 'standard' | 'advanced' =
         selectedDifficulty === 'basic'
           ? 'basic'
-          : selectedDifficulty === 'advanced'
+          : selectedDifficulty === 'applied'
           ? 'advanced'
           : 'standard';
 
@@ -402,20 +416,80 @@ export default function App() {
     });
   };
 
+  // Google Apps Script (GAS) 演習結果の自動連携
+  const triggerGasSync = (
+    total: number,
+    correctCount: number,
+    partialCount: number,
+    incorrectCount: number,
+    earnedPts: number,
+    maxPts: number,
+    accPct: number
+  ) => {
+    const config = getGasConfig();
+    if (!config.isConfigured) {
+      setGasSyncStatus('not_configured');
+      setGasSyncMessage('');
+      return;
+    }
+
+    // 画面再描画や再読込での二重送信防止
+    const sessionId = `${currentUnit.id}-${Date.now()}`;
+    if (lastSyncedDrillSessionIdRef.current === sessionId) return;
+    lastSyncedDrillSessionIdRef.current = sessionId;
+
+    setGasSyncStatus('sending');
+    setGasSyncMessage('スプレッドシートへ演習結果を送信中...');
+
+    const payload: GasDrillPayload = {
+      timestamp: getJSTTimestamp(),
+      subjectName: currentSubject.name,
+      grade: selectedGrade,
+      difficulty: isRetrying
+        ? 'リトライ'
+        : selectedDifficulty === 'basic'
+        ? '基礎'
+        : selectedDifficulty === 'standard'
+        ? '標準'
+        : '応用',
+      unitName: currentUnit.title,
+      item: isRetrying
+        ? selectedItem
+          ? `${selectedItem}【リトライ】`
+          : '【リトライ】'
+        : selectedItem,
+      totalQuestions: total,
+      correctCount,
+      partialCount,
+      incorrectCount,
+      earnedPoints: earnedPts,
+      maxPoints: maxPts,
+      accuracyPct: accPct,
+      token: config.token,
+    };
+
+    sendDrillResultToGas(payload)
+      .then((res) => {
+        if (res.success) {
+          setGasSyncStatus('success');
+          setGasSyncMessage('Googleスプレッドシートへ演習結果を自動連携しました');
+        } else if (res.queued) {
+          setGasSyncStatus('queued');
+          setGasSyncMessage('オフライン一時保存しました（次回オンライン時に自動再送）');
+        }
+      })
+      .catch((err) => {
+        console.warn('Silent fallback for GAS sync:', err);
+        setGasSyncStatus('queued');
+        setGasSyncMessage('一時保存（次回再送）');
+      });
+  };
+
   const handleResetData = () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
       setScores({});
-      // 獲得済みのバッジは将来にわたって取り消さない（ヒデ仕様厳守）
-      setBadgeStats((prev) => {
-        const preserved: BadgeStatsStore = {
-          ...createInitialBadgeStats({}),
-          unlockedBadgeIds: prev.unlockedBadgeIds,
-          longestStreak: prev.longestStreak,
-        };
-        localStorage.setItem(BADGE_STORAGE_KEY, JSON.stringify(preserved));
-        return preserved;
-      });
+      // 案A（教育的最適解）: 獲得済みバッジはもちろん、累計問題数・完走回数・連続日数などのバッジ進捗も一切初期化せず完全保持
       setShowResetModal(false);
     } catch (e) {
       console.error(e);
@@ -830,8 +904,25 @@ export default function App() {
     } else {
       const total = questions.length;
       const partialCount = userAnswersHistory.filter((h) => h.status === 'partial').length;
+      const incorrectCount = userAnswersHistory.filter((h) => h.status === 'incorrect').length;
+      const earnedPts = userAnswersHistory.reduce(
+        (sum, h) =>
+          sum +
+          (typeof h.points === 'number'
+            ? h.points
+            : h.status === 'correct'
+            ? 5
+            : h.status === 'partial'
+            ? 3
+            : 0),
+        0
+      );
+      const maxPts = total * 5;
+      const accPct = maxPts > 0 ? Math.round((earnedPts / maxPts) * 100) : 0;
+
       saveScoreRecord(currentUnit.id, currentScore, total, partialCount);
       recordDrillCompletionToBadges(total, currentScore, isRetrying);
+      triggerGasSync(total, currentScore, partialCount, incorrectCount, earnedPts, maxPts, accPct);
       setCurrentView('result');
     }
   };
@@ -1428,6 +1519,9 @@ export default function App() {
 
             {/* 🏆 称号 ＆ 達成バッジ (アコーディオン式) */}
             <BadgeListAccordion stats={badgeStats} />
+
+            {/* 📊 成績自動連携（スプレッドシート・GAS） (アコーディオン式) */}
+            <GasSyncSettingsAccordion />
           </div>
         )}
 
@@ -1949,6 +2043,35 @@ export default function App() {
               </div>
             </div>
 
+            {/* GAS Sync Status Banner (設定時のみ表示) */}
+            {gasSyncStatus !== 'not_configured' && gasSyncStatus !== 'idle' && (
+              <div
+                className={`max-w-md mx-auto p-3 rounded-xl border text-xs flex items-center justify-between gap-2 shadow-xs ${
+                  gasSyncStatus === 'success'
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                    : gasSyncStatus === 'sending'
+                    ? 'bg-sky-50 text-sky-900 border-sky-300'
+                    : 'bg-amber-50 text-amber-900 border-amber-300'
+                }`}
+              >
+                <div className="flex items-center gap-2 font-bold min-w-0">
+                  {gasSyncStatus === 'success' && (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  )}
+                  {gasSyncStatus === 'sending' && (
+                    <Loader2 className="w-4 h-4 text-sky-600 animate-spin shrink-0" />
+                  )}
+                  {gasSyncStatus === 'queued' && (
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  )}
+                  <span className="truncate">{gasSyncMessage}</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/80 border border-slate-300 shrink-0 font-bold">
+                  GAS連携
+                </span>
+              </div>
+            )}
+
             {/* Comparison with Previous Record */}
             {prevUnitAcc !== null && (
               <div className="max-w-md mx-auto p-3.5 rounded-xl bg-slate-50 border border-slate-300 text-xs sm:text-sm text-slate-700 flex items-center justify-between font-bold">
@@ -2118,11 +2241,16 @@ export default function App() {
           >
             <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
               <Trash2 className="w-5 h-5" />
-              <span>学習履歴のリセット</span>
+              <span>演習履歴・カルテのリセット</span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              これまでに演習した全教科の成績・正解率データをすべて初期化します。よろしいですか？
-            </p>
+            <div className="space-y-2 text-xs text-slate-300 leading-relaxed">
+              <p>
+                全教科の単元別演習履歴・正解率・カルテデータを初期化します。
+              </p>
+              <div className="p-2.5 rounded-lg bg-emerald-950/70 border border-emerald-500/40 text-emerald-200 text-[11px] font-bold leading-normal">
+                ✓ 獲得した称号バッジ、累計問題数、連続日数などのバッジ進捗はすべて安全に保持されます。
+              </div>
+            </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
@@ -2136,7 +2264,7 @@ export default function App() {
                 onClick={handleResetData}
                 className="px-3.5 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 transition cursor-pointer"
               >
-                初期化する
+                履歴カルテを初期化
               </button>
             </div>
           </div>

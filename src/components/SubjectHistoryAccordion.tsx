@@ -477,9 +477,10 @@ export const SubjectHistoryAccordion: React.FC<SubjectHistoryAccordionProps> = (
                 type="button"
                 onClick={onResetRequest}
                 className="text-rose-600 hover:text-rose-700 hover:bg-rose-100/70 border border-transparent hover:border-rose-300 font-bold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="単元別演習履歴・カルテのみ初期化（称号・バッジ進捗は安全に保持されます）"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>学習履歴のリセット</span>
+                <span>演習履歴・カルテのリセット</span>
               </button>
             )}
           </div>
