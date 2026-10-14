@@ -559,12 +559,19 @@ export default function App() {
       const pool: DrillQuestion[] = [...primaryCurated];
 
       // 足りない場合は同一教科の他の単元からも良問を集める（粗悪な自動生成文字列は1ミリも使用しない）
-      const subjPrefix = unitToStart.id.split('-')[0];
+      const subjChar = unitToStart.id.charAt(0);
       Object.entries(CURATED_QUESTIONS_MAP).forEach(([k, qList]) => {
-        if (k.startsWith(subjPrefix) && k !== unitToStart.id) {
+        if (k.charAt(0) === subjChar && k !== unitToStart.id) {
           pool.push(...qList);
         }
       });
+
+      // それでも不足する場合は全学年・全教科の厳選良問から補填して確実に必要数を保証
+      if (pool.length < selectedCount) {
+        Object.values(CURATED_QUESTIONS_MAP).forEach((qList) => {
+          pool.push(...qList);
+        });
+      }
 
       const shuffled = [...pool].sort(() => 0.5 - Math.random());
       const finalQuestions = shuffled.slice(0, selectedCount);

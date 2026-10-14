@@ -254,15 +254,22 @@ function getCuratedFallbackQuestions(unitId: string, countNeeded: number): Drill
     return shuffleArray(primaryCurated).slice(0, countNeeded);
   }
 
-  // 同一教科の他の単元からも良問を集めて補填（粗悪な自動生成文字列は1ミリも使用しない）
-  const subjPrefix = unitId.split('-')[0]; // 例: 'm2'
+  // 教科の頭文字（'m'=数学, 's'=理科, 'e'=英語, 'j'=国語, 'g'=地理, 'h'=歴史, 'c'=公民）で教科全域から集める
+  const subjChar = unitId.charAt(0);
   const pool: DrillQuestion[] = [...primaryCurated];
 
   Object.entries(CURATED_QUESTIONS_MAP).forEach(([k, qList]) => {
-    if (k.startsWith(subjPrefix) && k !== unitId) {
+    if (k.charAt(0) === subjChar && k !== unitId) {
       pool.push(...qList);
     }
   });
+
+  // それでも不足する場合は全学年・全教科の厳選良問から補填して確実に必要数を保証
+  if (pool.length < countNeeded) {
+    Object.values(CURATED_QUESTIONS_MAP).forEach((qList) => {
+      pool.push(...qList);
+    });
+  }
 
   return shuffleArray(pool).slice(0, countNeeded);
 }
@@ -300,7 +307,9 @@ app.post('/api/drill/generate', async (req: Request, res: Response) => {
     // 応用: 100%記述（思考・論述・計算・長文記述）
     choiceCount = 0;
   }
-  const textCount = numCount - choiceCount;
+  // 自己監査で数問が除外されても確実に必要問数を満たすため、AIへは余裕をもって余剰発注（+2問）
+  const generateCount = numCount + 2;
+  const generateTextCount = generateCount - choiceCount;
 
   // Attempt Gemini API with multi-tier failover: 3.8-flash (attempt 1) -> 3.8-flash (retry) -> 3.7-flash -> 3.6-flash -> 3.5-flash
   if (ai) {
@@ -320,15 +329,15 @@ app.post('/api/drill/generate', async (req: Request, res: Response) => {
       const modelName = attempt.model;
       try {
         const prompt = `あなたは文部科学省中学校学習指導要領および${textbook}に精通した優秀な${subjectName}科指導教官「テス」です。
-中学${unit.year}年生向け「${unit.title}」に関する演習問題を必ず【合計${numCount}問】作成してください。
+中学${unit.year}年生向け「${unit.title}」に関する演習問題を必ず【合計${generateCount}問】作成してください。
 ${itemInstruction}
 難易度設定: ${diffDesc}
 
 【問題形式・出題構成（★記述メイン・ハイブリッド編成）】
-- 総出題数: 必ず【${numCount}問】
-- 記述・一問一答問題: 必ず【${textCount}問】（重要語句・計算・思考・理由説明・短文記述・英作文など）
+- 総出題数: 必ず【${generateCount}問】
+- 記述・一問一答問題: 必ず【${generateTextCount}問】（重要語句・計算・思考・理由説明・短文記述・英作文など）
 - 概念定着のための4択問題: 必ず【${choiceCount}問】（基礎概念・用語の識別。重複のない4つの選択肢を用意）
-※【絶対厳守ルール】「すべて4択問題」の出力は絶対に禁止です。生徒の自力アウトプット力・記述力を鍛えるため、記述問題を主軸（${textCount}/${numCount}問）とし、4択問題は概念定着の導入（${choiceCount}問）としてのみ配置してください。${choiceCount === 0 ? '（全問記述問題として作成してください）' : ''}
+※【絶対厳守ルール】「すべて4択問題」の出力は絶対に禁止です。生徒の自力アウトプット力・記述力を鍛えるため、記述問題を主軸（${generateTextCount}/${generateCount}問）とし、4択問題は概念定着の導入（${choiceCount}問）としてのみ配置してください。${choiceCount === 0 ? '（全問記述問題として作成してください）' : ''}
 
 【厳格な作成＆6大自己監査ルール（★最重要）】
 0. 数学・理科の計算検算義務（計算ミス完全撲滅・最優先）: 数学・理科の計算問題、方程式、式の計算、関数、確率、理科の濃度・オームの法則などの計算を伴う問題では、必ず自ら途中の計算過程をステップごとに検算すること。15+6=21のように、足し算・引き算・掛け算・割り算・符号の算術的ミスは絶対に許されない。数学的に100%正確な模範解答のみを出力すること。
@@ -336,10 +345,10 @@ ${itemInstruction}
 2. 未習範囲自動封鎖（最重要）: 中学${unit.year}年生の指定単元より上位の公式・文法・解法（三平方の定理、平方根、二次方程式、現在完了、関係代名詞等）の出題・解説での使用を完全禁止。必ず指定学年の範囲内でのみ作問すること。
 3. 字体チェック: 中国簡体字（问）を完全禁止し、必ず日本の字体（問・直・骨・過・遅・海）のみを出力すること。
 4. 数式・表記統一: LaTeX記号($)や分数・平方根のコマンドは絶対禁止。必ずUnicode特殊文字（m²・cm²・℃・π・÷・×・√・±・≦・≧・CO₂など）を使用すること。分数は「(2x+3y)/5」、平方根は「√B/A」のように平易なテキスト表記とすること。
-5. 問数厳守: 必ず指定された合計【${numCount}問】を出力すること。途中終了は禁止。
+5. 問数厳守: 必ず指定された合計【${generateCount}問】を出力すること。途中終了は禁止。
 6. 教科純度100%: ${subjectName}以外の内容・他教科用語が混入しないこと。
 7. 4択問題 (${choiceCount}問): 各問に重複のない4つの選択肢（options）を設け、"answer" は options のいずれか1つと完全一致させること。
-8. 記述問題 (${textCount}問): "options" キーは含めない（または空配列にする）こと。"answer" に模範解答を提示し、許容される別解があれば括弧書きで「模範（別解）」のように添えること。
+8. 記述問題 (${generateTextCount}問): "options" キーは含めない（または空配列にする）こと。"answer" に模範解答を提示し、許容される別解があれば括弧書きで「模範（別解）」のように添えること。
 9. 解説の充実: "explanation" には生徒が自力で納得できる教育的根拠・考え方の急所・文末処理の注意点を明記すること。
 
 必ず以下の厳密なJSON配列形式のみで出力してください（Markdownコードブロックや前置きは禁止）：
@@ -351,7 +360,7 @@ ${itemInstruction}
     "answer": "正解の選択肢",
     "explanation": "わかりやすい解説"
   },` : ''}
-  // 記述問題（${textCount}問）
+  // 記述問題（${generateTextCount}問）
   {
     "question": "問題文",
     "answer": "模範解答（別解）",
@@ -376,7 +385,7 @@ ${itemInstruction}
         const parsed = JSON.parse(jsonText);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const audit = runSelfAudit(parsed, unit.subjectId, numCount, unit, item);
-          // 【厳格な問数準拠ルール】自己監査を合格した有効問数が指定数に達している場合のみ採用
+          // 自己監査を通過した良問が指定問数以上あればそのまま採用
           if (audit.sanitized.length >= numCount) {
             res.json({
               questions: audit.sanitized.slice(0, numCount),
@@ -385,10 +394,20 @@ ${itemInstruction}
               audited: true,
             });
             return;
-          } else {
-            console.warn(
-              `[AI Audit Reject] Model ${modelName} produced only ${audit.sanitized.length}/${numCount} valid questions (issues: ${audit.issues.join('; ')}). Failing over to next model...`
-            );
+          } else if (audit.sanitized.length > 0) {
+            // もし監査除外でわずかに不足した場合は、文科省厳選良問から不足分のみを補充して必ずnumCount問を完全保証
+            const needed = numCount - audit.sanitized.length;
+            const supplements = getCuratedFallbackQuestions(unitId, needed);
+            const finalSet = [...audit.sanitized, ...supplements].slice(0, numCount);
+            if (finalSet.length >= numCount) {
+              res.json({
+                questions: finalSet,
+                source: 'ai',
+                model: `${modelName} + 精選補填`,
+                audited: true,
+              });
+              return;
+            }
           }
         }
       } catch (err: any) {
@@ -397,7 +416,7 @@ ${itemInstruction}
     }
   }
 
-  // 全AIモデルが不達の場合のみ、文部科学省指導要領完全準拠の厳選良問バンクから出題
+  // 全AIモデルが不達の場合のみ、文部科学省指導要領完全準拠の厳選良問バンクから確実に出題
   const curated = getCuratedFallbackQuestions(unitId, numCount);
   res.json({
     questions: curated,
