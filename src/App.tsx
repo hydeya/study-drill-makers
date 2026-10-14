@@ -553,24 +553,23 @@ export default function App() {
 
       setCurrentView('practice');
     } catch (err: any) {
-      console.warn('API error, applying instant client question fallback:', err);
-      // Graceful client fallback: Check curated questions or generate from unit metadata
-      const curated = CURATED_QUESTIONS_MAP[unitToStart.id] || [];
-      if (curated.length > 0) {
-        const shuffled = [...curated].sort(() => 0.5 - Math.random());
-        let finalQuestions = shuffled.slice(0, selectedCount);
-        if (finalQuestions.length < selectedCount) {
-          const needed = selectedCount - finalQuestions.length;
-          const items = unitToStart.desc.split('／').map((s) => s.trim());
-          for (let i = 0; i < needed; i++) {
-            const sub = items[i % items.length] || itemToStart || unitToStart.title;
-            finalQuestions.push({
-              question: `【${unitToStart.title}】${sub}に関する重要事項または解法・用語を答えなさい。（問${finalQuestions.length + 1}）`,
-              answer: sub,
-              explanation: `文部科学省指導要領（${unitToStart.desc}）に基づく基礎確認問題です。`,
-            });
-          }
+      console.warn('API error, applying high quality curated question fallback:', err);
+      // クライアント側でも粗悪テンプレートを全廃し、文科省指導要領完全準拠の厳選良問のみを使用
+      const primaryCurated = CURATED_QUESTIONS_MAP[unitToStart.id] || [];
+      const pool: DrillQuestion[] = [...primaryCurated];
+
+      // 足りない場合は同一教科の他の単元からも良問を集める（粗悪な自動生成文字列は1ミリも使用しない）
+      const subjPrefix = unitToStart.id.split('-')[0];
+      Object.entries(CURATED_QUESTIONS_MAP).forEach(([k, qList]) => {
+        if (k.startsWith(subjPrefix) && k !== unitToStart.id) {
+          pool.push(...qList);
         }
+      });
+
+      const shuffled = [...pool].sort(() => 0.5 - Math.random());
+      const finalQuestions = shuffled.slice(0, selectedCount);
+
+      if (finalQuestions.length > 0) {
         setQuestions(finalQuestions);
         setCurrentQuestionIdx(0);
         setCurrentScore(0);
@@ -580,36 +579,7 @@ export default function App() {
         setLastSubmittedAnswer('');
         setIsJudged(false);
         setCurrentFeedback('');
-        setActiveModelName('文部科学省精選バンク (Client)');
-        const prev = scores[unitToStart.id];
-        setPrevUnitAcc(prev && prev.total > 0 ? Math.round((prev.correct / prev.total) * 100) : null);
-        setCurrentView('practice');
-        return;
-      }
-
-      // Dynamic fallback based on unit description items
-      const items = unitToStart.desc.split('／').map((s) => s.trim());
-      const fallbackQuestions: DrillQuestion[] = [];
-      for (let i = 0; i < selectedCount; i++) {
-        const sub = items[i % items.length] || itemToStart || unitToStart.title;
-        fallbackQuestions.push({
-          question: `【${unitToStart.title}】${sub}に関する重要事項または解法・用語を答えなさい。（問${i + 1}）`,
-          answer: sub,
-          explanation: `文部科学省指導要領（${unitToStart.desc}）に基づく基礎確認問題です。`,
-        });
-      }
-
-      if (fallbackQuestions.length > 0) {
-        setQuestions(fallbackQuestions);
-        setCurrentQuestionIdx(0);
-        setCurrentScore(0);
-        setUserAnswersHistory([]);
-        setUserTextInput('');
-        setSelectedChoice(null);
-        setLastSubmittedAnswer('');
-        setIsJudged(false);
-        setCurrentFeedback('');
-        setActiveModelName('指導要領シード (Client)');
+        setActiveModelName('文部科学省精選バンク');
         const prev = scores[unitToStart.id];
         setPrevUnitAcc(prev && prev.total > 0 ? Math.round((prev.correct / prev.total) * 100) : null);
         setCurrentView('practice');
@@ -676,15 +646,15 @@ export default function App() {
   // Current Question Data
   const currentQ = questions[currentQuestionIdx];
 
-  // Safety Guard: Revert to setup if practice is entered without questions
+  // Safety Guard: Revert to setup only if practice is genuinely empty and not in loading state
   useEffect(() => {
-    if (currentView === 'practice' && (!questions || questions.length === 0 || !currentQ)) {
-      if (!isLoadingDrill) {
-        console.warn('Practice view opened without questions. Falling back to setup.');
+    if (currentView === 'practice' && !isLoadingDrill) {
+      if (!questions || questions.length === 0) {
+        console.warn('Practice view has no questions. Falling back to setup.');
         setCurrentView('setup');
       }
     }
-  }, [currentView, questions, currentQ, isLoadingDrill]);
+  }, [currentView, questions, isLoadingDrill]);
 
   // Focus Shield: Keep focus permanently pinned to practiceCardRef so focus NEVER escapes iframe
   const practiceCardRef = useRef<HTMLDivElement>(null);
