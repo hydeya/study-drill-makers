@@ -6,6 +6,29 @@
 export const GAS_URL_STORAGE_KEY = 'study_drill_makers_gas_url';
 export const GAS_TOKEN_STORAGE_KEY = 'study_drill_makers_gas_token';
 export const GAS_QUEUE_STORAGE_KEY = 'study_drill_makers_gas_pending_queue';
+export const SHEET_URL_STORAGE_KEY = 'study_drill_makers_sheet_url';
+
+export const DEFAULT_SPREADSHEET_URL =
+  'https://docs.google.com/spreadsheets/d/1uC4hsdRytTdvm5m7g5REcmRtK2_QrhSKHNYdtgteL80/edit?usp=drivesdk';
+
+export function getSpreadsheetUrl(): string {
+  if (typeof window === 'undefined') return DEFAULT_SPREADSHEET_URL;
+  try {
+    const saved = localStorage.getItem(SHEET_URL_STORAGE_KEY);
+    return (saved && saved.trim()) || DEFAULT_SPREADSHEET_URL;
+  } catch {
+    return DEFAULT_SPREADSHEET_URL;
+  }
+}
+
+export function saveSpreadsheetUrl(url: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SHEET_URL_STORAGE_KEY, url.trim());
+  } catch (e) {
+    console.warn('Failed to save spreadsheet url', e);
+  }
+}
 
 export interface GasConfig {
   url: string;

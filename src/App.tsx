@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Compass,
   ExternalLink,
+  FileSpreadsheet,
   X,
   Send,
   Loader2,
@@ -60,6 +61,7 @@ import {
   sendDrillResultToGas,
   getJSTTimestamp,
   getGasConfig,
+  getSpreadsheetUrl,
   GasDrillPayload,
 } from './services/gasSync';
 import {
@@ -2184,6 +2186,20 @@ export default function App() {
                 <span>単元選択に戻る</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* 📊 成績一覧&グラフ（スプレッドシート）直通リンク */}
+            <div className="pt-1 max-w-md mx-auto">
+              <a
+                href={getSpreadsheetUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:via-teal-500 hover:to-emerald-500 text-white font-black text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-950/20 transition cursor-pointer active:scale-98 border border-emerald-400/40"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-100 shrink-0" />
+                <span>成績一覧&グラフを見る</span>
+                <ExternalLink className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
+              </a>
             </div>
           </div>
         )}
