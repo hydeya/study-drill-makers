@@ -121,10 +121,25 @@ interface AuditResult {
 function runSelfAudit(
   questions: any[],
   subjectId: SubjectId,
-  countNeeded: number
+  countNeeded: number,
+  unit?: any,
+  targetItem?: string
 ): AuditResult {
   const issues: string[] = [];
   const sanitized: DrillQuestion[] = [];
+
+  const blacklistTerms = new Set<string>();
+  if (unit) {
+    blacklistTerms.add(String(unit.title || '').toLowerCase().trim());
+    if (unit.desc) {
+      String(unit.desc)
+        .split('／')
+        .forEach((s) => blacklistTerms.add(s.toLowerCase().trim()));
+    }
+  }
+  if (targetItem) {
+    blacklistTerms.add(targetItem.toLowerCase().trim());
+  }
 
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
@@ -138,6 +153,30 @@ function runSelfAudit(
 
     if (!questionText || !answerText) {
       issues.push(`問${i + 1}: 問題文または解答が空です`);
+      continue;
+    }
+
+    // 不良品検知1: 解答が単元名や小単元名と完全一致している（オウム返しナンセンス問題の排除）
+    const cleanAns = answerText.toLowerCase().trim();
+    if (blacklistTerms.has(cleanAns)) {
+      issues.push(`問${i + 1}: 解答が単元名「${answerText}」と完全一致する無意味問題のため除外`);
+      continue;
+    }
+
+    // 不良品検知2: 解答が抽象的プレースホルダー（「の基本事項」「の内容」など）
+    if (/の基本事項|の内容|の公式|の性質|の計算規則/.test(answerText)) {
+      issues.push(`問${i + 1}: 解答「${answerText}」が抽象的語句のため除外`);
+      continue;
+    }
+
+    // 不良品検知3: 解答が問題文中にネタバレしている（4文字以上の一致）
+    if (
+      cleanAns.length >= 4 &&
+      questionText.toLowerCase().includes(cleanAns) &&
+      !questionText.includes('選') &&
+      !questionText.includes('選び')
+    ) {
+      issues.push(`問${i + 1}: 解答「${answerText}」が問題文でネタバレしているため除外`);
       continue;
     }
 
@@ -208,108 +247,24 @@ function runSelfAudit(
   };
 }
 
-// Generate fallback questions if AI is unavailable (subject-specific educational phrasing)
-function generateSeedFallbackQuestions(
-  unit: any,
-  item: string,
-  count: number,
-  choiceCount: number,
-  textCount: number
-): DrillQuestion[] {
-  const subjectId = unit.subjectId as SubjectId;
-  const subjectName = SUBJECT_NAMES_JP[subjectId];
-  const items = unit.desc.split('／').map((s: string) => s.trim());
-  const targetItem = item || items[0] || unit.title;
+// Fallback: 粗悪な機械生成テンプレートを全廃し、文科省指導要領完全準拠の厳選良問（CURATED_QUESTIONS_MAP）からのみ抽出
+function getCuratedFallbackQuestions(unitId: string, countNeeded: number): DrillQuestion[] {
+  const primaryCurated = CURATED_QUESTIONS_MAP[unitId] || [];
+  if (primaryCurated.length >= countNeeded) {
+    return shuffleArray(primaryCurated).slice(0, countNeeded);
+  }
 
-  const results: DrillQuestion[] = [];
+  // 同一教科の他の単元からも良問を集めて補填（粗悪な自動生成文字列は1ミリも使用しない）
+  const subjPrefix = unitId.split('-')[0]; // 例: 'm2'
+  const pool: DrillQuestion[] = [...primaryCurated];
 
-  const getSubjectQuestion = (sub: string, qIdx: number): { q: string; a: string; exp: string } => {
-    switch (subjectId) {
-      case 'math': {
-        const p = [
-          { q: `【数学・${unit.title}】${sub}における計算または関係式を正確に答えなさい。`, a: sub, exp: `啓林館『未来へひろがる数学』中${unit.year}の重要公式・解法に基づく問題です。` },
-          { q: `【数学・${unit.title}】${sub}の性質を利用して求められる値または関係式を答えなさい。`, a: sub, exp: `基本公式と計算プロセスの確実な定着を問う問題です。` },
-          { q: `【数学・${unit.title}】${sub}に関する条件を満たす式または代表的な数値を答えなさい。`, a: sub, exp: `単元の重要事項と計算規則の確認問題です。` },
-        ];
-        return p[qIdx % p.length];
-      }
-      case 'english': {
-        const p = [
-          { q: `【英語・${unit.title}】${sub}の文法規則に従って、適切な英文または語句を答えなさい。`, a: sub, exp: `東京書籍『NEW HORIZON』中${unit.year}の重要文法項目です。` },
-          { q: `【英語・${unit.title}】${sub}を用いた表現において、空所または語形変化として適切な語を答えなさい。`, a: sub, exp: `主語の人称・時制や文型の一致に注意して解答します。` },
-        ];
-        return p[qIdx % p.length];
-      }
-      case 'science': {
-        const p = [
-          { q: `【理科・${unit.title}】${sub}の実験・観察において確認される現象や物質名、法則名を答えなさい。`, a: sub, exp: `東京書籍『新しい理科』中${unit.year}の重要観察事項・実験結果です。` },
-          { q: `【理科・${unit.title}】${sub}に関する基本原理や、発生する気体・物質の名称を答えなさい。`, a: sub, exp: `因果関係や化学式・物理法則の理解を深める問題です。` },
-        ];
-        return p[qIdx % p.length];
-      }
-      case 'geography': {
-        const p = [
-          { q: `【地理・${unit.title}】${sub}に見られる代表的な地形・気候または産業の特徴を答えなさい。`, a: sub, exp: `東京書籍『新しい社会 地理分野』の重要地域特色・統計事項です。` },
-          { q: `【地理・${unit.title}】${sub}に関する都市名、山脈・平野名、または地域課題を答えなさい。`, a: sub, exp: `地図上の位置関係と地域特性の結びつきを確認する問題です。` },
-        ];
-        return p[qIdx % p.length];
-      }
-      case 'history': {
-        const p = [
-          { q: `【歴史・${unit.title}】${sub}に関わる歴史的な事件・法律、または中心となった人物名を答えなさい。`, a: sub, exp: `東京書籍『新しい社会 歴史分野』の時代背景と重要事項です。` },
-          { q: `【歴史・${unit.title}】${sub}によってもたらされた社会の変化や政策の名称を答えなさい。`, a: sub, exp: `歴史の流れと原因・結果の因果関係を把握する問題です。` },
-        ];
-        return p[qIdx % p.length];
-      }
-      case 'civics': {
-        const p = [
-          { q: `【公民・${unit.title}】日本国憲法や現代社会において「${sub}」を規定・保障する制度や原則を答えなさい。`, a: sub, exp: `東京書籍『新しい社会 公民分野』の重要憲法条文・社会制度です。` },
-          { q: `【公民・${unit.title}】${sub}における仕組みや、国民の権利・義務に関する重要用語を答えなさい。`, a: sub, exp: `民主主義・市場経済・国際社会の基本概念を確認する問題です。` },
-        ];
-        return p[qIdx % p.length];
-      }
-      default: {
-        const p = [
-          { q: `【国語・${unit.title}】${sub}に関する文章読解において、筆者の主張や重要語句として適切なものを答えなさい。`, a: sub, exp: `東京書籍『新しい国語』中${unit.year}の読解・語彙の重要ポイントです。` },
-          { q: `【国語・${unit.title}】${sub}における表現技法や文法上の役割、言葉の意味を答えなさい。`, a: sub, exp: `文脈に応じた的確な言葉の運用と読解力を養う問題です。` },
-        ];
-        return p[qIdx % p.length];
-      }
+  Object.entries(CURATED_QUESTIONS_MAP).forEach(([k, qList]) => {
+    if (k.startsWith(subjPrefix) && k !== unitId) {
+      pool.push(...qList);
     }
-  };
+  });
 
-  // 1. 概念定着のための4択問題
-  for (let i = 0; i < choiceCount; i++) {
-    const subItem = items[i % items.length] || targetItem;
-    const itemA = items[(i + 1) % items.length] || '他の概念・用語';
-    const itemB = items[(i + 2) % items.length] || '異なる単元の事項';
-    const itemC = items[(i + 3) % items.length] || '例外的事項';
-    results.push({
-      question: `【${subjectName}・${unit.title}】「${subItem}」に関する記述として最も適切なものを1つ選びなさい。（第${i + 1}問）`,
-      options: [
-        `${subItem}の基本事項`,
-        `${itemA}の内容`,
-        `${itemB}の内容`,
-        `${itemC}の内容`,
-      ],
-      answer: `${subItem}の基本事項`,
-      explanation: `文部科学省指導要領に準拠した${unit.title}（${subItem}）の重要知識です。`,
-    });
-  }
-
-  // 2. 記述・一問一答問題（主軸）
-  for (let i = 0; i < textCount; i++) {
-    const qNum = choiceCount + i + 1;
-    const subItem = items[(choiceCount + i) % items.length] || targetItem;
-    const t = getSubjectQuestion(subItem, i);
-    results.push({
-      question: `${t.q}（第${qNum}問）`,
-      answer: t.a,
-      explanation: t.exp,
-    });
-  }
-
-  return results.slice(0, count);
+  return shuffleArray(pool).slice(0, countNeeded);
 }
 
 // Endpoint: Generate questions
@@ -420,23 +375,20 @@ ${itemInstruction}
 
         const parsed = JSON.parse(jsonText);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const audit = runSelfAudit(parsed, unit.subjectId, numCount);
-          if (audit.sanitized.length > 0) {
-            // If slightly short, supplement with seed questions
-            let finalQuestions = audit.sanitized;
-            if (finalQuestions.length < numCount) {
-              const needed = numCount - finalQuestions.length;
-              const seeds = generateSeedFallbackQuestions(unit, item, needed, 0, needed);
-              finalQuestions = [...finalQuestions, ...seeds];
-            }
-
+          const audit = runSelfAudit(parsed, unit.subjectId, numCount, unit, item);
+          // 【厳格な問数準拠ルール】自己監査を合格した有効問数が指定数に達している場合のみ採用
+          if (audit.sanitized.length >= numCount) {
             res.json({
-              questions: finalQuestions.slice(0, numCount),
+              questions: audit.sanitized.slice(0, numCount),
               source: 'ai',
               model: modelName,
               audited: true,
             });
             return;
+          } else {
+            console.warn(
+              `[AI Audit Reject] Model ${modelName} produced only ${audit.sanitized.length}/${numCount} valid questions (issues: ${audit.issues.join('; ')}). Failing over to next model...`
+            );
           }
         }
       } catch (err: any) {
@@ -445,37 +397,12 @@ ${itemInstruction}
     }
   }
 
-  // Fallback to high quality curated question bank (Tokyo Shoseki / Keirinkan / New Horizon)
-  const curated = CURATED_QUESTIONS_MAP[unitId] || [];
-  if (curated.length > 0) {
-    const shuffled = shuffleArray(curated);
-    if (shuffled.length >= numCount) {
-      res.json({
-        questions: shuffled.slice(0, numCount),
-        source: 'curated',
-        model: 'MEXT Curated Bank',
-        audited: true,
-      });
-      return;
-    }
-    // If fewer than requested, combine curated + procedural
-    const needed = numCount - shuffled.length;
-    const seeds = generateSeedFallbackQuestions(unit, item, needed, 0, needed);
-    res.json({
-      questions: [...shuffled, ...seeds],
-      source: 'curated',
-      model: 'MEXT Curriculum Bank',
-      audited: true,
-    });
-    return;
-  }
-
-  // Dynamic seed generator fallback (Descriptive-first)
-  const seeds = generateSeedFallbackQuestions(unit, item, numCount, choiceCount, textCount);
+  // 全AIモデルが不達の場合のみ、文部科学省指導要領完全準拠の厳選良問バンクから出題
+  const curated = getCuratedFallbackQuestions(unitId, numCount);
   res.json({
-    questions: seeds,
+    questions: curated,
     source: 'curated',
-    model: 'MEXT Curriculum Bank',
+    model: '文部科学省指導要領精選バンク',
     audited: true,
   });
 });
