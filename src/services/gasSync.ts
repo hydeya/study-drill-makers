@@ -125,6 +125,20 @@ export async function sendDrillResultToGas(
       throw new Error(`HTTP Error: ${res.status}`);
     }
 
+    // GASからのJSONレスポンスを検証（合言葉不一致等で status: "error" が返ってきた場合）
+    try {
+      const data = await res.json();
+      if (data && data.status === 'error') {
+        throw new Error(data.message === 'auth' ? '合言葉認証エラー' : (data.message || 'GASエラー'));
+      }
+    } catch (parseErr: any) {
+      // JSONエラーで明示的にthrowされたエラーは外側へ伝播
+      if (parseErr.message.includes('認証') || parseErr.message.includes('GASエラー')) {
+        throw parseErr;
+      }
+      // 通常のプレーンテキスト等の場合は200 OKとして通過
+    }
+
     // 成功したらキュー内の未送信データもバックグラウンドで消化
     flushPendingQueue(config.url, config.token).catch(() => {});
 
@@ -216,9 +230,13 @@ export async function testGasConnection(
     try {
       const data = await res.json();
       if (data.status === 'error') {
+        const errMsg =
+          data.message === 'auth'
+            ? '認証失敗: 合言葉（Token）が正しくありません。登録済みの合言葉を確認してください。'
+            : `GASエラー: ${data.message || 'データ処理に失敗しました。'}`;
         return {
           success: false,
-          message: `GASエラー: ${data.message || '合言葉が一致しない可能性があります。'}`,
+          message: errMsg,
         };
       }
     } catch {

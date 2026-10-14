@@ -157,7 +157,7 @@ export const GasSyncSettingsAccordion: React.FC<GasSyncSettingsAccordionProps> =
               type="text"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="例: test1234"
+              placeholder="合言葉を入力"
               className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-xs font-mono focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/50 transition"
               autoComplete="off"
             />
